@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Performance da Frota</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background-color: #f4f4f9; padding: 20px; }
+        header { text-align: center; padding: 20px 10px; background-color: #007bff; color: white; margin-bottom: 20px; border-radius: 8px; }
+        .container { max-width: 1400px; margin: auto; }
+
+        /* Estilos dos Níveis de Risco */
+        .risk-levels { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 30px; }
+        .risk-card {
+            padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 280px; text-align: center; font-size: 0.9em;
+        }
+        .risk-card h4 { margin-top: 0; margin-bottom: 5px; font-size: 1.1em; }
+        .risk-card.level-1 { background-color: #d4edda; border-left: 5px solid #28a745; }
+        .risk-card.level-2 { background-color: #fff3cd; border-left: 5px solid #ffc107; }
+        .risk-card.level-3 { background-color: #f8d7da; border-left: 5px solid #dc3545; }
+        .risk-card.level-4 { background-color: #e2e3e5; border-left: 5px solid #6c757d; color: #343a40; }
+
+        /* Estilos dos Cards dos Navios */
+        #ship-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 20px;
+        }
+        .ship-card {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s;
+        }
+        .ship-card:hover { transform: translateY(-5px); }
+        .ship-card h3 { margin-top: 0; margin-bottom: 5px; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
+        .ship-details { margin-bottom: 15px; font-size: 0.9em; }
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }
+        .status-1 { background-color: #28a745; color: white; }
+        .status-2 { background-color: #ffc107; color: #343a40; }
+        .status-3 { background-color: #dc3545; color: white; }
+        .status-4 { background-color: #6c757d; color: white; }
+        .chart-container-small { height: 200px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h2>🌊 Dashboard de Performance da Frota e Sugestão de Limpeza</h2>
+            <p>Visualização em tempo real do HPI (Hull Performance Index) e Consumo Extra Projetado.</p>
+        </header>
+
+        <h3>Níveis de Bioincrustação (Escala de Risco)</h3>
+        <div class="risk-levels">
+            <div class="risk-card level-1">
+                <h4>Nível 1: Limpo / Bom</h4>
+                <p>HPI $\approx 1.0$. Eficiência máxima. Monitoramento de rotina.</p>
+            </div>
+            <div class="risk-card level-2">
+                <h4>Nível 2: Moderado</h4>
+                <p>HPI $1.0 - 1.04$. Microincrustação leve. Iniciar planejamento de limpeza.</p>
+            </div>
+            <div class="risk-card level-3">
+                <h4>Nível 3: Alto / Crítico</h4>
+                <p>HPI $1.04 - 1.08$. Macroincrustação aparente. Agendar limpeza urgente.</p>
+            </div>
+            <div class="risk-card level-4">
+                <h4>Nível 4: URGENTE / Extremo</h4>
+                <p>HPI $> 1.08$. Macroincrustação pesada. Perda de eficiência inaceitável.</p>
+            </div>
+        </div>
+        <hr/>
+
+        <h3>Detalhes da Frota</h3>
+        <div id="ship-dashboard">
+            <p>Carregando dados da frota...</p>
+        </div>
+    </div>
+
+    <script>
+        const NAVIOS_ID = [
+            "Bruno Lima", "Carla Silva", "Daniel Pereira", "Eduardo Costa",
+            "Fábio Santos", "Felipe Ribeiro", "Gabriela Martins", "Giselle Carvalho",
+            "Henrique Alves", "Lucas Mendonça", "Marcos Cavalcanti", "Maria Valentina",
+            "Paulo Moura", "Rafael Santos", "Raul Martins", "Renato Gomes",
+            "Ricardo Barbosa", "Rodrigo Pinheiro", "Romario Silva", "Thiago Fernandes",
+            "Victor Oliveira"
+        ];
+
+        const API_BASE_URL = "http://localhost:8080/api/v1/previsao/limpeza-sugerida?navioId=";
+        const dashboard = document.getElementById('ship-dashboard');
+
+        // Função para obter o status visual (classe CSS)
+        function getStatusClass(nivel) {
+            if (nivel >= 4) return 'status-4';
+            if (nivel === 3) return 'status-3';
+            if (nivel === 2) return 'status-2';
+            return 'status-1';
+        }
+
+        // Função para formatar a data
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('pt-BR');
+        }
+
+        // Função para desenhar o gráfico HPI para um navio específico
+        function drawHPIChart(canvasId, predictions) {
+            const dates = predictions.map(p => new Date(p.data).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' }));
+            const hpiValues = predictions.map(p => p.hpi);
+            const nivelBioincrustacao = predictions.length > 0 ? (hpiValues[0] > 1.08 ? 4 : (hpiValues[0] > 1.04 ? 3 : (hpiValues[0] > 1.0 ? 2 : 1))) : 1;
+
+            let lineColor = 'rgba(75, 192, 192, 1)'; // Nível 1/2
+            if (nivelBioincrustacao >= 3) lineColor = 'rgba(255, 99, 132, 1)'; // Nível 3/4 (Crítico/Urgente)
+
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates.slice(0, 30), // Limita a 30 dias para o gráfico do card
+                    datasets: [{
+                        label: 'HPI Projetado',
+                        data: hpiValues.slice(0, 30),
+                        borderColor: lineColor,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        pointRadius: 1,
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.1
+                    },
+                    {
+                        // Linha de referência HPI = 1.0
+                        label: 'HPI Ideal',
+                        data: Array(30).fill(1.0),
+                        borderColor: 'rgba(0, 123, 255, 0.7)',
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            display: true,
+                            title: { display: true, text: 'HPI' },
+                            min: 1.0
+                        },
+                        x: { display: false } // Oculta as datas no card pequeno
+                    }
+                }
+            });
+        }
+
+        // Função para criar o card e desenhar o gráfico
+        function createShipCard(data) {
+            const navioIdEncoded = data.navioId.replace(/ /g, '_');
+            const statusClass = getStatusClass(data.nivelBioincrustacao);
+
+            // Cria o HTML do card
+            const cardHtml = `
+                <div class="ship-card">
+                    <h3>${data.navioId}</h3>
+                    <div class="ship-details">
+                        <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${data.statusCascoAtual}</span></p>
+                        <p><strong>Nível Risco:</strong> ${data.nivelBioincrustacao}</p>
+                        <p><strong>CFI Limpo (Base):</strong> ${data.cfiCleanTonPerDay ? data.cfiCleanTonPerDay.toFixed(2) : 'N/A'} Ton/Dia</p>
+                        <p><strong>Consumo Extra Máx:</strong> ${data.maxExtraFuelTonPerDay ? data.maxExtraFuelTonPerDay.toFixed(2) : 'N/A'} Ton/Dia</p>
+                        <p><strong>Limpeza Sugerida:</strong> ${formatDate(data.dataIdealLimpeza)}</p>
+                    </div>
+                    <div class="chart-container-small">
+                        <canvas id="chart-${navioIdEncoded}"></canvas>
+                    </div>
+                </div>
+            `;
+
+            // Insere o card no DOM
+            dashboard.insertAdjacentHTML('beforeend', cardHtml);
+
+            // Desenha o gráfico
+            if (data.predictions && data.predictions.length > 0) {
+                drawHPIChart(`chart-${navioIdEncoded}`, data.predictions);
+            }
+        }
+
+        // Função principal de carregamento
+        async function loadDashboard() {
+            dashboard.innerHTML = ''; // Limpa o "Carregando dados..."
+
+            const promises = NAVIOS_ID.map(navioId => {
+                const navioIdUrl = encodeURIComponent(navioId);
+                return fetch(API_BASE_URL + navioIdUrl)
+                    .then(response => {
+                        if (!response.ok) {
+                            console.error(`Erro ao carregar ${navioId}: ${response.statusText}`);
+                            return { navioId, error: "Dados não encontrados ou erro na API." };
+                        }
+                        return response.json();
+                    })
+                    .catch(e => {
+                         console.error(`Erro de rede para ${navioId}: ${e.message}`);
+                         return { navioId, error: "Erro de rede/CORS." };
+                    });
+            });
+
+            const results = await Promise.all(promises);
+
+            results.forEach(result => {
+                if (result.error) {
+                    // Exibe um card simples de erro
+                    dashboard.insertAdjacentHTML('beforeend', `<div class="ship-card" style="background-color: #f8d7da;"><h3>${result.navioId}</h3><p>Erro: ${result.error}</p></div>`);
+                } else {
+                    createShipCard(result);
+                }
+            });
+        }
+
+        loadDashboard();
+
+    </script>
+</body>
+</html>
