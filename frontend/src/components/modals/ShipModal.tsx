@@ -149,6 +149,33 @@ export const ShipModal: React.FC<ShipModalProps> = ({
             </Card>
           </div>
 
+          <Card className="border-l-4 border-l-orange-500 animate-fade-in-up stagger-4">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                <Info className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 flex-shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-gray-600">
+                  Comprometimento do Casco
+                </span>
+              </div>
+              <p className="text-lg sm:text-xl font-bold text-orange-600">
+                {data.porcentagemComprometimentoAtual.toFixed(2)}%
+              </p>
+              <div className="h-2 bg-orange-200 rounded-full mt-2">
+                <div 
+                  className={cn(
+                    'h-full rounded-full transition-all',
+                    data.porcentagemComprometimentoAtual >= 40 ? 'bg-red-600' :
+                    data.porcentagemComprometimentoAtual >= 15 ? 'bg-orange-500' :
+                    data.porcentagemComprometimentoAtual >= 1 ? 'bg-yellow-500' :
+                    'bg-green-500'
+                  )}
+                  style={{ width: `${Math.min(100, data.porcentagemComprometimentoAtual)}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Cobertura de incrustação</p>
+            </CardContent>
+          </Card>
+
           {data.dataUltimaLimpeza && (
             <Card className="bg-green-50/50 border-green-200 animate-fade-in-up stagger-4">
               <CardContent className="p-3 sm:p-4">
