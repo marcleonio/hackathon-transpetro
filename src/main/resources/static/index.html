@@ -66,6 +66,9 @@
         <div class="summary-item status-0">
             <strong>Combustível Extra Máximo:</strong><br><span id="max-fuel"></span> Ton/Dia
         </div>
+        <div class="summary-item status-4">
+            <strong>Craca Estimada (Hoje):</strong><br><span id="porcentagem-craca" style="font-size: 1.2em; font-weight: bold;"></span>
+        </div>
     </div>
 
     <p style="text-align: center; font-style: italic;" id="justificativa-text"></p>
@@ -186,6 +189,12 @@
         document.getElementById('dias-restantes').textContent = data.diasParaIntervencao > 0 ? data.diasParaIntervencao + ' dias' : 'N/A';
         document.getElementById('max-fuel').textContent = data.maxExtraFuelTonPerDay.toFixed(2);
         document.getElementById('justificativa-text').textContent = data.justificativa;
+        const porcentagemCracaElement = document.getElementById('porcentagem-craca');
+        if (data.porcentagemComprometimentoAtual !== undefined) {
+             porcentagemCracaElement.textContent = data.porcentagemComprometimentoAtual.toFixed(2) + '%';
+        } else {
+             porcentagemCracaElement.textContent = 'N/A';
+        }
 
         // Atualiza Status e Estilo
         const statusElement = document.getElementById('summary-status');
