@@ -182,7 +182,7 @@
 
     function updateSummary(data) {
         document.getElementById('ultima-limpeza').textContent = formatDate(data.dataUltimaLimpeza);
-        document.getElementById('data-ideal').textContent = data.dataLimpezaIdeal ? formatDate(data.dataLimpezaIdeal) : 'Não necessário em 180 dias';
+        document.getElementById('data-ideal').textContent = data.dataIdealLimpeza ? formatDate(data.dataIdealLimpeza) : 'Não necessário em 180 dias';
         document.getElementById('dias-restantes').textContent = data.diasParaIntervencao > 0 ? data.diasParaIntervencao + ' dias' : 'N/A';
         document.getElementById('max-fuel').textContent = data.maxExtraFuelTonPerDay.toFixed(2);
         document.getElementById('justificativa-text').textContent = data.justificativa;
@@ -194,8 +194,8 @@
         // Remove classes de status antigas
         statusElement.className = 'summary-item';
         // Adiciona a nova classe de status
-        statusElement.classList.add(`status-${data.nivelAtual}`);
-        statusDesc.textContent = data.statusDescricao;
+        statusElement.classList.add(`status-${data.nivelBioincrustacao}`);
+        statusDesc.textContent = data.statusCascoAtual;
     }
 
     function formatDate(dateString) {

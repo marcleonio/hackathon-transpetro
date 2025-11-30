@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -66,7 +67,7 @@ public class ModelService {
                     .parse(in);
 
             for (CSVRecord record : records) {
-                String shipName = record.get("Navio").trim().toUpperCase();
+                String shipName = normalizeShipId(record.get("Navio"));
                 String dateString = record.get("Docagem").trim();
 
                 if (shipName.isEmpty() || dateString.isEmpty()) continue;
@@ -118,7 +119,7 @@ public class ModelService {
                 .parse(in);
 
             for (CSVRecord record : records) {
-                String shipName = record.get("Nome do navio").trim().toUpperCase();
+                String shipName = normalizeShipId(record.get("Nome do navio"));
                 String dateString = record.get("Data da aplicacao").trim();
                 String periodo = record.get("Cr1. Período base de verificação").trim();
 
@@ -158,7 +159,7 @@ public class ModelService {
 
             for (CSVRecord record : records) {
 
-                String shipName = record.get("Nome do navio").trim().toUpperCase();
+                String shipName = normalizeShipId(record.get("Nome do navio"));
                 String shipClass = record.get("Classe").trim();
                 String cargoType = record.get("Tipo").trim();
 
@@ -287,7 +288,7 @@ public class ModelService {
                         int beaufortScale = Integer.parseInt(record.get("beaufortScale").trim());
 
                         ConsolidatedRecord rec = new ConsolidatedRecord(
-                            sessionId, record.get("shipName").trim().toUpperCase(), record.get("class"), record.get("eventName"), record.get("startGMTDate"),
+                            sessionId, normalizeShipId(record.get("shipName")), record.get("class"), record.get("eventName"), record.get("startGMTDate"),
                             consumptionMap.get(sessionId), duration, speed, aftDraft, fwdDraft, displacement, beaufortScale
                         );
 
@@ -319,7 +320,7 @@ public class ModelService {
 
             // 1. CALCULAR DIAS DESDE LIMPEZA (X1)
             LocalDate eventDate = parseDate(rec.getStartGMTDate());
-            LocalDate lastCleaningDate = lastCleaningMap.get(rec.getShipName());
+            LocalDate lastCleaningDate = lastCleaningMap.get(normalizeShipId(rec.getShipName()));
 
             if (lastCleaningDate == null || eventDate == null || eventDate.isBefore(lastCleaningDate)) {
                 continue;
@@ -333,7 +334,7 @@ public class ModelService {
             double dailyConsumption = rec.getConsumedQuantity() / (rec.getDuration() / 24.0);
 
             // Consumo de Referência: Usar o CFI Limpo ESPECÍFICO do navio.
-            double cfiCleanSpec = getCfiCleanTonPerDay(rec.getShipName());
+            double cfiCleanSpec = getCfiCleanTonPerDay(normalizeShipId(rec.getShipName()));
 
             // HPI é a razão entre o consumo real e o consumo de referência para uma condição limpa.
             // Se o CFI específico não for encontrado, getCfiCleanTonPerDay retorna a média da frota (FALLBACK_CFI)
@@ -381,9 +382,9 @@ public class ModelService {
         final int NUM_FEATURES = 3;
 
         if (trainingData.size() < NUM_FEATURES + 2) {
-             System.err.println("   - Dados insuficientes para treinamento. Mínimo: " + (NUM_FEATURES + 2) + " registros.");
-             this.trainedModel = null;
-             return;
+            System.err.println("   - Dados insuficientes para treinamento. Mínimo: " + (NUM_FEATURES + 2) + " registros.");
+            this.trainedModel = null;
+            return;
         }
 
         // Y (Variável Dependente): HPI
@@ -429,7 +430,7 @@ public class ModelService {
         for (ConsolidatedRecord rec : rawData) {
 
             LocalDate eventDate = parseDate(rec.getStartGMTDate());
-            LocalDate lastCleaningDate = lastDockingMap.get(rec.getShipName());
+            LocalDate lastCleaningDate = lastDockingMap.get(normalizeShipId(rec.getShipName()));
 
             if (lastCleaningDate == null || eventDate == null || eventDate.isBefore(lastCleaningDate)) {
                 continue;
@@ -445,14 +446,14 @@ public class ModelService {
 
                 // Armazena o consumo por navio
                 shipConsumptionPostClean
-                    .computeIfAbsent(rec.getShipName(), k -> new ArrayList<>())
+                    .computeIfAbsent(normalizeShipId(rec.getShipName()), k -> new ArrayList<>())
                     .add(dailyConsumption);
             }
         }
 
         // 2. Calcula a média (CFI_Limpo) para cada navio
         for (Map.Entry<String, List<Double>> entry : shipConsumptionPostClean.entrySet()) {
-            String shipName = entry.getKey();
+            String shipName = normalizeShipId(entry.getKey());
             List<Double> consumptions = entry.getValue();
 
             if (!consumptions.isEmpty()) {
@@ -464,9 +465,33 @@ public class ModelService {
         System.out.println("   - CFI_Limpo calculado para " + cfiCleanMap.size() + " navios (usando dias " + DAYS_POST_CLEANING_START + "-" + DAYS_POST_CLEANING_END + ").");
     }
 
+    public String normalizeShipId(String shipId) {
+        if (shipId == null || shipId.isEmpty()) {
+            return "";
+        }
+
+        // 1. Normaliza para o formato NFD (Canonical Decomposition)
+        String normalized = Normalizer.normalize(shipId.trim().toUpperCase(), Normalizer.Form.NFD);
+
+        // 2. Remove todos os caracteres diacríticos (acentos, cedilha, til)
+        // O regex \\p{InCombiningDiacriticalMarks}+ remove todos os caracteres de marcação combinada.
+        normalized = normalized.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+
+        // 3. Opcional: Remove caracteres que não sejam letras, números ou espaços (se necessário)
+        // Se o nome puder conter traços ou pontos, ajuste este regex.
+        // Para simplificação, focaremos apenas em letras e números.
+        // Exemplo: Substituir outros caracteres não essenciais por espaço ou remover
+        // normalized = normalized.replaceAll("[^A-Z0-9 ]", "");
+
+        // 4. Substitui espaços múltiplos por um único espaço
+        normalized = normalized.replaceAll("\\s+", " ").trim();
+
+        return normalized;
+    }
+
     public LocalDate getLastCleaningDate(String shipName) {
         // Normaliza o nome do navio para MAIÚSCULAS antes da busca
-        String normalizedName = shipName.trim().toUpperCase();
+        String normalizedName = normalizeShipId(shipName);
 
         // Retorna a data do mapa de docagem
         return lastDockingMap.get(normalizedName);
@@ -477,7 +502,7 @@ public class ModelService {
      * Se não encontrado no mapa, retorna o FALLBACK_CFI.
      */
     public double getCfiCleanTonPerDay(String shipName) {
-        String normalizedName = shipName.trim().toUpperCase();
+        String normalizedName = normalizeShipId(shipName);
 
         // Retorna o valor específico ou o FALLBACK, se não houver dados limpos
         return cfiCleanMap.getOrDefault(normalizedName, FALLBACK_CFI);

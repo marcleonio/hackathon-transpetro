@@ -165,7 +165,7 @@ public class PredictionService {
     // --- MÉTODO PRINCIPAL DE PREVISÃO ---
 
     public CleaningSuggestionDto suggestCleaningDate(String navioId) {
-        navioId = navioId.trim().toUpperCase(); // Garante que o navioId esteja em maiúsculas
+        navioId = modelService.normalizeShipId(navioId); // Garante que o navioId esteja em maiúsculas
 
         double cfiCleanTonPerDay = modelService.getCfiCleanTonPerDay(navioId);
         LocalDate ultimaLimpeza = modelService.getLastCleaningDate(navioId);
@@ -196,6 +196,7 @@ public class PredictionService {
         if (rawCoefficients.length < 4) {
             double coefDiasFallback = rawCoefficients.length > 1 ? rawCoefficients[1] : DEFAULT_DEGRADATION_RATE;
             double coefAjustado = coefDiasFallback > 0 ? coefDiasFallback : DEFAULT_DEGRADATION_RATE;
+            System.out.println("❌ ERRO: Modelo treinado com número insuficiente de coeficientes (" + rawCoefficients.length + "). Usando Fallback.");
             rawCoefficients = new double[] {rawCoefficients[0], coefAjustado, 0.0, 0.0};
         }
         double[] coefficients = adjustCoefficients(rawCoefficients);
@@ -234,8 +235,11 @@ public class PredictionService {
         for (long days = daysSinceLastCleaning + 1; days < maxDays; days++) {
             LocalDate predictionDate = ultimaLimpeza.plusDays(days);
 
-            // PREVISÃO DO HPI (Assumindo TRIM e Deslocamento médios/zero para a projeção)
-            double calculatedHPI = intercept + (betaDays * days);
+            // PREVISÃO DO HPI
+            double calculatedHPI = intercept
+                                 + (betaDays * days)
+                                 + (betaTrim * trimFuture)        // betaTrim * 0.0
+                                 + (betaDeslocamento * deslocamentoFuture);
             predictedHPI = Math.max(1.0, calculatedHPI);
 
             DailyPredictionDto prediction = new DailyPredictionDto(predictionDate, predictedHPI,0d,0d,getEstimatedIncrustationCoverageGranular(predictedHPI));
