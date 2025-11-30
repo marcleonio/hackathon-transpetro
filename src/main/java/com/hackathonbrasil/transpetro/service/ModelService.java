@@ -389,25 +389,4 @@ public class ModelService {
         return cfiCleanMap.getOrDefault(normalizedName, FALLBACK_CFI);
     }
 
-    /**
-     * Retorna o Coeficiente B0 (Intercepto) do modelo OLS.
-     * Este é o HPI de linha de base (para um navio médio com features X=0).
-     */
-    public double getModelIntercept() {
-        if (trainedModel == null || trainedModel.estimateRegressionParameters().length < 1) {
-            return 1.0; // Retorno seguro se o treino falhar
-        }
-        return trainedModel.estimateRegressionParameters()[0];
-    }
-
-    /**
-     * Retorna o Coeficiente B1 (Taxa de Degradação) para 'Dias Desde Limpeza'.
-     */
-    public double getDegradationRate() {
-        if (trainedModel == null || trainedModel.estimateRegressionParameters().length < 2) {
-            return 0.0005; // Retorno seguro (seu valor FALLBACK)
-        }
-        return trainedModel.estimateRegressionParameters()[1];
-    }
-
 }

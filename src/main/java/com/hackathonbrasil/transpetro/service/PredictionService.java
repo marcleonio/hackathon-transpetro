@@ -23,41 +23,59 @@ public class PredictionService {
     //dias para gerar e analisar o HPI e o Consumo Extra para os próximos 180 dias (cerca de 6 meses), impede que a degradação para um futuro muito distante
     private static final int MAX_PROJECTION_DAYS = 180;
 
-    private static final double HPI_LEVEL_1_MAX = 1.03;
-    private static final double HPI_LEVEL_2_MAX = 1.06;
+    private static final double HPI_THRESHOLD = 1.025;
+    private static final double HPI_LEVEL_4_START = 1.08; // > 8% de perda
+    private static final double HPI_LEVEL_3_START = 1.06; // > 6% de perda
+    private static final double HPI_LEVEL_2_START = HPI_THRESHOLD; // 1.025, o gatilho real de limpeza
     private static final double DEFAULT_DEGRADATION_RATE = 0.0005;
+    private static final double HPI_ACCEPTABLE_MAX_CLEAN = 1.030; // 3% de perda é o máximo aceitável para um casco "limpo" (Ponto de corte entre Nível 1 e 2)
 
-    // ... (Métodos adjustCoefficients, getNivelBioincrustacao, getStatusDescricao - MANTIDOS) ...
     private double[] adjustCoefficients(double[] rawCoefficients) {
-        // Posições: 0: Intercepto, 1: DiasDesdeLimpeza, 2: TRIM, 3: Deslocamento
         if (rawCoefficients.length < 4) {
+            // Lógica de fallback mantida (se o array for muito curto)
             return rawCoefficients;
         }
+
         double[] adjusted = Arrays.copyOf(rawCoefficients, rawCoefficients.length);
 
+        // --- 1. AJUSTE DO COEFICIENTE DE DIAS (Taxa de Degradação) ---
         double betaDays = rawCoefficients[1];
-        if (betaDays <= 0) {
-            System.out.println("⚠️ WARNING: Coeficiente de Dias Limpeza inválido. Usando taxa padrão.");
+        if (betaDays <= 0 || betaDays > 0.005) { // Evita taxas negativas ou irrealisticamente altas (ex: 0.5% por dia)
+            System.out.println("⚠️ WARNING: Coeficiente de Dias Limpeza inválido/não razoável. Usando taxa padrão.");
             adjusted[1] = DEFAULT_DEGRADATION_RATE;
         }
 
+        // --- 2. AJUSTE DO INTERCEPTO (HPI Inicial - Ponto de Partida) ---
         double intercept = rawCoefficients[0];
-        if (intercept > 1.05) {
-            System.out.println("⚠️ WARNING: Intercepto muito alto. Resetando para 1.0.");
+
+        if (intercept < 1.00) {
+            // O HPI não pode ser menor que 1.00 (Eficiência 100%)
+            System.out.println("⚠️ WARNING: Intercepto abaixo de 1.0. Corrigindo para 1.0.");
             adjusted[0] = 1.0;
+        } else if (intercept > HPI_ACCEPTABLE_MAX_CLEAN) {
+            // Se o intercepto for muito alto, forçamos para o limite superior aceitável.
+            // Isso simula que o navio foi "limpo" na melhor condição possível.
+            System.out.println("⚠️ WARNING: Intercepto muito alto. Corrigindo para o limite máximo aceitável (" + HPI_ACCEPTABLE_MAX_CLEAN + ").");
+            adjusted[0] = HPI_ACCEPTABLE_MAX_CLEAN;
         }
+
         return adjusted;
     }
 
     private int getNivelBioincrustacao(double hpi) {
-        if (hpi >= HPI_LIMITE_DECISAO) {
+        // Nível 4 (Ação mais urgente)
+        if (hpi >= HPI_LEVEL_4_START) {
             return 4;
-        } else if (hpi > HPI_LEVEL_2_MAX) {
+        // Nível 3 (Ação urgente)
+        } else if (hpi >= HPI_LEVEL_3_START) {
             return 3;
-        } else if (hpi > HPI_LEVEL_1_MAX) {
+        // Nível 2 (Início da Limpeza Reativa, usando o HPI_THRESHOLD real)
+        } else if (hpi >= HPI_LEVEL_2_START) {
             return 2;
+        // Nível 1 (Microencrustação)
         } else if (hpi > 1.00) {
             return 1;
+        // Nível 0 (Limpo)
         } else {
             return 0;
         }
@@ -160,6 +178,13 @@ public class PredictionService {
             if (dataIdeal == null && predictedHPI >= HPI_LIMITE_DECISAO) {
                 dataIdeal = predictionDate;
             }
+
+            if (dataIdeal == null && predictedHPI >= HPI_THRESHOLD) {
+                // Atribui o PRIMEIRO dia que atingiu o limite de limpeza
+                dataIdeal = predictionDate;
+                // Já encontramos a data ideal. Podemos quebrar o loop para otimizar.
+                break; // <-- SAÍDA OTIMIZADA DO LOOP
+            }
         }
 
         // 5. Montagem do DTO Final
@@ -169,6 +194,7 @@ public class PredictionService {
         String justificativa;
         if (dataIdeal != null) {
             justificativa = "HPI projetado atingiu o limite de " + HPI_LIMITE_DECISAO + " na data sugerida.";
+            justificativa = "Data de limpeza sugerida: HPI projetado atingiu o limite de performance.";
         } else {
             justificativa = "HPI projetado (" + String.format("%.2f", predictedHPI) + ") não atingiu o limite dentro de 180 dias de projeção.";
         }

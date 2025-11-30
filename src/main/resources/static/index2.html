@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Preditivo HPI - Transpetro</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #007bff;
+            text-align: center;
+        }
+        #dashboard-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .ship-card {
+            background-color: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            width: 350px; /* Largura fixa para os cards */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s;
+        }
+        .ship-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        }
+        .ship-card h2 {
+            color: #0056b3;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .highlight {
+            font-weight: bold;
+            color: #d9534f; /* Vermelho para alerta */
+        }
+        /* Estilos baseados no nível numérico do DTO: nivelBioincrustacao */
+        .status-0 { color: green; font-weight: bold; }
+        .status-1 { color: orange; font-weight: bold; }
+        .status-2, .status-3, .status-4 { color: red; font-weight: bold; }
+
+        #loading, #error {
+            text-align: center;
+            padding: 15px;
+            font-size: 1.1em;
+        }
+        #error { color: red; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🚢 Dashboard Preditivo de Desempenho do Casco (HPI)</h1>
+    <p style="text-align: center;">Previsão de degradação e sugestão de limpeza para os navios monitorados.</p>
+
+    <div id="loading" style="color: #007bff; display: block;">Carregando dados dos navios...</div>
+    <div id="error" style="display: none;"></div>
+
+    <div id="dashboard-container">
+    </div>
+</div>
+
+<script>
+    // ⚠️ URL CORRIGIDA CONFORME SOLICITADO
+    const API_BASE_URL = 'http://localhost:8080/api/v1/previsao/limpeza-sugerida';
+
+    // ⚠️ LISTA DE NAVIOS CORRIGIDA CONFORME SOLICITADO
+    const SHIPS_TO_MONITOR = [
+        "RAFAEL SANTOS", "HENRIQUE ALVES", "VICTOR OLIVEIRA", "FELIPE RIBEIRO",
+        "GISELLE CARVALHO", "RAUL MARTINS", "PAULO MOURA", "MARCOS CAVALCANTI",
+        "DANIEL PEREIRA", "CARLA SILVA", "RENATO GOMES", "GABRIELA MARTINS",
+        "RODRIGO PINHEIRO", "EDUARDO COSTA", "THIAGO FERNANDES", "ROMARIO SILVA",
+        "LUCAS MENDONÇA", "RICARDO BARBOSA", "BRUNO LIMA", "FÁBIO SANTOS",
+        "MARIA VALENTINA"
+    ];
+
+    const chartInstances = {};
+    const HPI_THRESHOLD = 1.025;
+
+    document.addEventListener('DOMContentLoaded', loadDashboard);
+
+    function loadDashboard() {
+        const loadingDiv = document.getElementById('loading');
+        loadingDiv.textContent = `Carregando dados de ${SHIPS_TO_MONITOR.length} navios...`;
+
+        SHIPS_TO_MONITOR.forEach(navioId => {
+            fetchPrediction(navioId);
+        });
+
+        loadingDiv.style.display = 'none';
+    }
+
+    function fetchPrediction(navioId) {
+        // Usa encodeURIComponent para navios com espaços no nome
+        const url = `${API_BASE_URL}?navioId=${encodeURIComponent(navioId)}`;
+
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    return response.json()
+                        .then(err => { throw new Error(err.message || `Erro HTTP ${response.status}`); })
+                        .catch(() => { throw new Error(`Falha ao acessar API para ${navioId}. Status: ${response.status}`); });
+                }
+                return response.json();
+            })
+            .then(data => {
+                displayResults(data);
+                drawChart(data, `chart-${navioId.replace(/\s/g, '-')}`); // ID do canvas sem espaços
+            })
+            .catch(error => {
+                console.error(`Falha na consulta para ${navioId}:`, error);
+                displayErrorCard(navioId, error.message);
+            });
+    }
+
+    function displayErrorCard(navioId, message) {
+        const container = document.getElementById('dashboard-container');
+        const card = document.createElement('div');
+        card.className = 'ship-card';
+        card.innerHTML = `
+            <h2>🚢 ${navioId}</h2>
+            <p style="color: red;">🚨 FALHA DE DADOS:</p>
+            <p>${message}</p>
+        `;
+        container.appendChild(card);
+    }
+
+    function displayResults(data) {
+        const container = document.getElementById('dashboard-container');
+        const card = document.createElement('div');
+        card.className = 'ship-card';
+
+        // ⚠️ CORREÇÃO DO ERRO DE 'REPLACE'
+        const statusDescricao = data.statusCascoAtual || 'STATUS INDISPONÍVEL';
+        const nivel = data.nivelBioincrustacao !== undefined ? data.nivelBioincrustacao : 9;
+
+        const dataIdealText = data.dataIdealLimpeza
+                            ? data.dataIdealLimpeza
+                            : 'Não sugerida (Proativa)';
+
+        // ⚠️ USO DOS NOMES DO DTO ORIGINAL: statusCascoAtual e maxExtraFuelTonPerDay
+        card.innerHTML = `
+            <h2>🚢 ${data.navioId}</h2>
+            <p><strong>Nível Atual:</strong> <span class="status-${nivel}">${nivel} - ${statusDescricao.replace(/[\(\)🚨🟢🟡🟠🔴]/g, '').trim()}</span></p>
+            <p><strong>Data Ideal Limpeza:</strong> <span class="highlight">${dataIdealText}</span></p>
+            <p><strong>Perda Máxima Projetada:</strong> ${data.maxExtraFuelTonPerDay ? data.maxExtraFuelTonPerDay.toFixed(3) : 'N/A'} t/dia</p>
+            <p style="font-size: 0.9em; margin-top: 15px;">** Justificativa: ${data.justificativa || 'Motivo não detalhado.'} **</p>
+
+            <div style="margin-top: 15px;">
+                <canvas id="chart-${data.navioId.replace(/\s/g, '-')}" width="400" height="200"></canvas>
+            </div>
+        `;
+        container.appendChild(card);
+    }
+
+    function drawChart(data, canvasId) {
+        const labels = data.predictions.map(p => p.data);
+        const hpiValues = data.predictions.map(p => p.hpi);
+        const ctx = document.getElementById(canvasId).getContext('2d');
+
+        if (chartInstances[canvasId]) {
+            chartInstances[canvasId].destroy();
+        }
+
+        const maxHPI = Math.max(...hpiValues) * 1.005;
+        const minHPI = 1.00;
+
+        chartInstances[canvasId] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'HPI Projetado',
+                    data: hpiValues,
+                    borderColor: 'rgba(0, 123, 255, 0.8)',
+                    borderWidth: 2,
+                    pointRadius: 1,
+                    fill: false,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        display: false,
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'HPI'
+                        },
+                        min: minHPI,
+                        max: maxHPI,
+                        afterBuildTicks: function(axis) {
+                            if (axis.ticks[0].value !== HPI_THRESHOLD) {
+                                axis.ticks.push({ value: HPI_THRESHOLD, label: 'LIMITE CRÍTICO' });
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                         callbacks: {
+                            title: function(context) {
+                                return 'Data: ' + context[0].label;
+                            },
+                            label: function(context) {
+                                return 'HPI: ' + context.parsed.y.toFixed(5);
+                            }
+                        }
+                    }
+                },
+                annotation: {
+                    annotations: [{
+                        type: 'line',
+                        mode: 'horizontal',
+                        scaleID: 'y',
+                        value: HPI_THRESHOLD,
+                        borderColor: 'red',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                    }]
+                }
+            }
+        });
+    }
+
+</script>
+
+</body>
+</html>
