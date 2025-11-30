@@ -19,10 +19,17 @@ public class CleaningSuggestionDto {
     private String navioId;
 
     /**
+     * Data da última limpeza do casco, usada como ponto de partida (t=0) para a projeção.
+     */
+    private LocalDate dataUltimaLimpeza; // <--- NOVO CAMPO AQUI
+
+    /**
      * Data ideal para limpeza (primeiro dia onde HPI >= 1.08).
      * Pode ser null se o limite não for atingido em 180 dias.
      */
     private LocalDate dataIdealLimpeza;
+
+    private long diasParaIntervencao;
 
     private String justificativa;
 

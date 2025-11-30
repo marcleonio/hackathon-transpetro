@@ -92,6 +92,75 @@ public class PredictionService {
         }
     }
 
+    /**
+     * Mapeia o HPI projetado para a Porcentagem de Cobertura da Superfície
+     * (Estimated Incrustation Coverage), seguindo as RNs de Nível de Bioincrustação.
+     * * NOTA: Os limites de HPI são ESTIMATIVAS de correlação entre perda de performance (HPI)
+     * e a cobertura física.
+     * @param hpi O HPI (Hull Performance Index) calculado.
+     * @return A porcentagem de cobertura da superfície correspondente ao Nível de Bioincrustação.
+     */
+    private double getEstimatedIncrustationCoverage(double hpi) {
+        if (hpi <= 1.025) {
+            // Nível 0 (0% Cobertura) ou Nível 1 (Microincrustação - Cobertura muito baixa).
+            // Usamos 1.0% como um valor de representação Proativa/Baixa.
+            return 1.0;
+        } else if (hpi <= 1.050) {
+            // Nível 2: Macroincrustação leve (1-15% Cobertura).
+            // Atribuímos o LIMITE MÁXIMO da faixa (15%) para indicar a pior condição do nível.
+            return 15.0;
+        } else if (hpi <= 1.100) {
+            // Nível 3: Macroincrustação moderada (16-40% Cobertura).
+            // Atribuímos o LIMITE MÁXIMO da faixa (40%).
+            return 40.0;
+        } else {
+            // Nível 4: Macroincrustação pesada (41-100% Cobertura).
+            // Atribuímos 100% como a condição mais crítica.
+            return 100.0;
+        }
+    }
+
+    /**
+     * Realiza uma interpolação linear para mapear um valor (HPI) de uma faixa
+     * para outra faixa (Porcentagem de Cobertura).
+     */
+    private double linearMap(double value, double inMin, double inMax, double outMin, double outMax) {
+        if (inMax == inMin) return outMin;
+        double normalized = (value - inMin) / (inMax - inMin);
+        return outMin + normalized * (outMax - outMin);
+    }
+
+    /**
+     * Faz a estimativa da Porcentagem de Cobertura da Superfície de forma contínua e arredondada.
+     * @param hpi O HPI calculado.
+     * @return Porcentagem de Cobertura Estimada (0.00 a 100.00).
+     */
+    private double getEstimatedIncrustationCoverageGranular(double hpi) {
+        double coverage;
+
+        if (hpi <= 1.025) {
+            // Nível 0/1: [0.0%, 1.0%]
+            coverage = linearMap(hpi, 1.000, 1.025, 0.0, 1.0);
+
+        } else if (hpi <= 1.050) {
+            // Nível 2: [1.0%, 15.0%]
+            coverage = linearMap(hpi, 1.025, 1.050, 1.0, 15.0);
+
+        } else if (hpi <= 1.100) {
+            // Nível 3: [15.0%, 40.0%]
+            coverage = linearMap(hpi, 1.050, 1.100, 15.0, 40.0);
+
+        } else {
+            // Nível 4: [40.0%, 100.0%]
+            double maxHpi = 1.200;
+            coverage = linearMap(hpi, 1.100, maxHpi, 40.0, 100.0);
+            coverage = Math.min(coverage, 100.0);
+        }
+
+        // ARREDONDAMENTO PARA DUAS CASAS DECIMAIS
+        // Multiplica por 100, arredonda, e divide por 100 novamente.
+        return Math.round(coverage * 100.0) / 100.0;
+    }
 
     // --- MÉTODO PRINCIPAL DE PREVISÃO ---
 
@@ -148,7 +217,7 @@ public class PredictionService {
 
         // --- 3. PONTO INICIAL (HOJE) ---
         // CRIA A PREVISÃO INICIAL, CALCULA AS MÉTRICAS E ADICIONA À LISTA
-        DailyPredictionDto initialPrediction = new DailyPredictionDto(dataHoje, predictedHPI,0d,0d);
+        DailyPredictionDto initialPrediction = new DailyPredictionDto(dataHoje, predictedHPI,0d,0d,getEstimatedIncrustationCoverageGranular(predictedHPI));
         calculatePerformanceMetrics(initialPrediction, cfiCleanTonPerDay);
         predictions.add(initialPrediction); // ADICIONADO UMA ÚNICA VEZ
         maxExtraFuel = initialPrediction.getExtraFuelTonPerDay();
@@ -165,7 +234,7 @@ public class PredictionService {
             predictedHPI = Math.max(1.0, calculatedHPI);
 
             // CRIA, CALCULA MÉTRICAS E ADICIONA À LISTA
-            DailyPredictionDto prediction = new DailyPredictionDto(predictionDate, predictedHPI,0d,0d);
+            DailyPredictionDto prediction = new DailyPredictionDto(predictionDate, predictedHPI,0d,0d,getEstimatedIncrustationCoverageGranular(predictedHPI));
             calculatePerformanceMetrics(prediction, cfiCleanTonPerDay);
 
             predictions.add(prediction);
@@ -182,8 +251,7 @@ public class PredictionService {
             if (dataIdeal == null && predictedHPI >= HPI_THRESHOLD) {
                 // Atribui o PRIMEIRO dia que atingiu o limite de limpeza
                 dataIdeal = predictionDate;
-                // Já encontramos a data ideal. Podemos quebrar o loop para otimizar.
-                break; // <-- SAÍDA OTIMIZADA DO LOOP
+                break;
             }
         }
 
@@ -201,7 +269,9 @@ public class PredictionService {
 
         return new CleaningSuggestionDto(
             navioId,
+            ultimaLimpeza,
             dataIdeal,
+            ChronoUnit.DAYS.between(ultimaLimpeza, dataIdeal),
             justificativa,
             statusDescricaoAtual,
             nivelAtual,
@@ -217,6 +287,8 @@ public class PredictionService {
         return new CleaningSuggestionDto(
             navioId,
             null,
+            null,
+            0l,
             motivo,
             getStatusDescricao(nivel),
             nivel,

@@ -29,5 +29,11 @@ public class DailyPredictionDto {
      */
     private double extraFuelTonPerDay; // Ex: 9.06
 
+    /**
+     * Porcentagem de Cobertura da Superfície, mapeada a partir do Nível/HPI (RN).
+     * (Ex: 15% se o Nível for 2)
+     */
+    private double estimatedIncrustationCoverage;
+
     // ... getters e setters ...
 }
