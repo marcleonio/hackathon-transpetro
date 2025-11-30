@@ -12,40 +12,6 @@ import java.util.List;
 @Repository
 public interface RelatorioRepository extends JpaRepository<Relatorio, Long> {
 
-<<<<<<< HEAD
-    List<Relatorio> findByNavioIdOrderByDataRegistroDesc(String navioId);
-
-    List<Relatorio> findByTipoRelatorioOrderByDataRegistroDesc(String tipoRelatorio);
-
-    List<Relatorio> findByStatusOrderByDataRegistroDesc(String status);
-
-    List<Relatorio> findByNivelBioincrustacaoOrderByDataRegistroDesc(Integer nivelBioincrustacao);
-
-    @Query("SELECT r FROM Relatorio r WHERE r.dataRegistro BETWEEN :dataInicio AND :dataFim ORDER BY r.dataRegistro DESC")
-    List<Relatorio> findByDataRegistroBetween(
-        @Param("dataInicio") LocalDateTime dataInicio,
-        @Param("dataFim") LocalDateTime dataFim
-    );
-
-    @Query("SELECT r FROM Relatorio r WHERE " +
-           "(:navioId IS NULL OR r.navioId = :navioId) AND " +
-           "(:tipoRelatorio IS NULL OR r.tipoRelatorio = :tipoRelatorio) AND " +
-           "(:status IS NULL OR r.status = :status) AND " +
-           "(:nivelBioincrustacao IS NULL OR r.nivelBioincrustacao = :nivelBioincrustacao) " +
-           "ORDER BY r.dataRegistro DESC")
-    List<Relatorio> findWithFilters(
-        @Param("navioId") String navioId,
-        @Param("tipoRelatorio") String tipoRelatorio,
-        @Param("status") String status,
-        @Param("nivelBioincrustacao") Integer nivelBioincrustacao
-    );
-
-    @Query("SELECT r FROM Relatorio r WHERE " +
-           "LOWER(r.titulo) LIKE LOWER(CONCAT('%', :busca, '%')) OR " +
-           "LOWER(r.descricao) LIKE LOWER(CONCAT('%', :busca, '%')) " +
-           "ORDER BY r.dataRegistro DESC")
-    List<Relatorio> searchByText(@Param("busca") String busca);
-=======
     // Buscar por navio
     List<Relatorio> findByNavioIdOrderByDataRegistroDesc(String navioId);
 
@@ -87,6 +53,5 @@ public interface RelatorioRepository extends JpaRepository<Relatorio, Long> {
            "LOWER(r.observacoesAdicionais) LIKE LOWER(CONCAT('%', :termo, '%'))) " +
            "ORDER BY r.dataRegistro DESC")
     List<Relatorio> buscarPorNavioETermo(@Param("navioId") String navioId, @Param("termo") String termo);
->>>>>>> master
 }
 

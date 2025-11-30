@@ -19,57 +19,6 @@ public class Relatorio {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-<<<<<<< HEAD
-    @Column(nullable = false, length = 100)
-    private String navioId;
-
-    @Column(nullable = false, length = 50)
-    private String tipoRelatorio;
-
-    @Column(nullable = false)
-    private LocalDateTime dataRegistro;
-
-    @Column(nullable = false, length = 100)
-    private String registradoPor;
-
-    @Column(nullable = false, length = 200)
-    private String titulo;
-
-    @Column(columnDefinition = "TEXT")
-    private String descricao;
-
-    @Column(length = 100)
-    private String localizacao;
-
-    @Column
-    private Integer nivelBioincrustacao;
-
-    @Column
-    private Double consumoObservado;
-
-    @Column(length = 50)
-    private String tipoLimpeza;
-
-    @Column
-    private LocalDate dataLimpeza;
-
-    @Column(nullable = false, length = 20)
-    private String status;
-
-    @Column(columnDefinition = "TEXT")
-    private String anexos;
-
-    @Column(length = 100)
-    private String coordenadas;
-
-    @Column(columnDefinition = "TEXT")
-    private String observacoesAdicionais;
-
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(nullable = false)
-=======
     // Identificação
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "navio_id")
@@ -126,7 +75,6 @@ public class Relatorio {
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
->>>>>>> master
     private LocalDateTime updatedAt;
 
     @PrePersist
