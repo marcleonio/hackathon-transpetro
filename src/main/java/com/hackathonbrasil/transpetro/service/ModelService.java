@@ -7,9 +7,14 @@ import com.hackathonbrasil.transpetro.model.TrainingDataRecord;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.hackathonbrasil.transpetro.model.Navio;
+import com.hackathonbrasil.transpetro.repository.DocagemRepository;
+import com.hackathonbrasil.transpetro.repository.NavioRepository;
+import com.hackathonbrasil.transpetro.repository.RevestimentoRepository;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.math3.stat.regression.OLSMultipleLinearRegression;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -38,6 +43,15 @@ public class ModelService {
 
     private final Map<String, RevestimentoDetail> revestimentosMap = new HashMap<>();
 
+    @Autowired
+    private NavioRepository navioRepository;
+
+    @Autowired
+    private DocagemRepository docagemRepository;
+
+    @Autowired
+    private RevestimentoRepository revestimentoRepository;
+
     // Constantes de Limites
     private static final int DAYS_POST_CLEANING_START = 3; // Começa a contar a partir do 3º dia
     private static final int DAYS_POST_CLEANING_END = 7;   // Último dia para o cálculo da média
@@ -57,13 +71,11 @@ public class ModelService {
 
     /**
      * Lê o arquivo de docagem e retorna a data de docagem mais recente para cada navio.
+     * Também busca dados do banco de dados.
      */
     private Map<String, LocalDate> loadDockingDates(String filePath) throws IOException {
-
-
+        // 1. Carregar do CSV (como está hoje)
         try (Reader in = new FileReader(new ClassPathResource(filePath).getFile())) {
-
-            // Assumindo cabeçalhos: Navio, Docagem, Tipo
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                     .builder()
                     .setHeader("Navio", "Docagem", "Tipo")
@@ -77,17 +89,29 @@ public class ModelService {
 
                 if (shipName.isEmpty() || dateString.isEmpty()) continue;
 
-                // Tenta parsear no formato Mês/Dia/Ano (M/D/YYYY)
                 LocalDate dockingDate = parseDockingDate(dateString);
 
                 if (dockingDate != null) {
-                    // Lógica: Mantém apenas a data mais recente
                     lastDockingMap.compute(shipName, (k, existingDate) ->
                         (existingDate == null || dockingDate.isAfter(existingDate)) ? dockingDate : existingDate
                     );
                 }
             }
         }
+
+        // 2. Carregar do banco de dados
+        navioRepository.findAll().forEach(navio -> {
+            String navioNome = normalizeShipId(navio.getNome());
+            docagemRepository.findUltimaDocagemByNavioId(navio.getId())
+                .ifPresent(docagem -> {
+                    LocalDate dataDocagem = docagem.getDataDocagem();
+                    // Se não existe no map ou se a data do banco é mais recente, usar a do banco
+                    lastDockingMap.compute(navioNome, (k, existingDate) ->
+                        (existingDate == null || dataDocagem.isAfter(existingDate)) ? dataDocagem : existingDate
+                    );
+                });
+        });
+
         return lastDockingMap;
     }
 
@@ -112,10 +136,8 @@ public class ModelService {
     }
 
     public void carregarDadosRevestimento(String filePath) throws IOException {
-
+        // 1. Carregar do CSV (como está hoje)
         try (Reader in = new FileReader(new ClassPathResource(filePath).getFile())) {
-
-            // ... (configuração do CSVFormat: verifique se o header reflete todas as colunas) ...
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                 .builder()
                 .setHeader("Sigla", "Nome do navio", "TipoClass", "TipoCarga", "ClasseNum", "Data da aplicacao", "Cr1. Período base de verificação", "Cr1. Parada máxima acumulada no período")
@@ -128,33 +150,45 @@ public class ModelService {
                 String dateString = record.get("Data da aplicacao").trim();
                 String periodo = record.get("Cr1. Período base de verificação").trim();
 
-                // Tenta parsear a data de aplicação (formato M/D/YYYY)
                 LocalDate dataAplicacao = parseDockingDate(dateString);
-
                 if (dataAplicacao == null) continue;
 
                 int periodoBase = Integer.parseInt(periodo);
 
-                // CRÍTICO: Atualiza ou insere, mantendo SOMENTE o revestimento com a data de aplicação MAIS RECENTE
                 revestimentosMap.compute(shipName, (k, existingDetail) -> {
                     if (existingDetail == null || dataAplicacao.isAfter(existingDetail.getDataAplicacao())) {
-                        // Novo registro ou registro mais recente encontrado
                         return new RevestimentoDetail(shipName, periodoBase, dataAplicacao);
                     }
-                    return existingDetail; // Mantém o registro existente (mais recente)
+                    return existingDetail;
                 });
             }
         }
+
+        // 2. Carregar do banco de dados
+        navioRepository.findAll().forEach(navio -> {
+            String navioNome = normalizeShipId(navio.getNome());
+            revestimentoRepository.findUltimoRevestimentoByNavioId(navio.getId())
+                .ifPresent(rev -> {
+                    LocalDate dataAplicacao = rev.getDataAplicacao();
+                    int periodoBase = rev.getPeriodoBaseVerificacao();
+                    
+                    revestimentosMap.compute(navioNome, (k, existingDetail) -> {
+                        if (existingDetail == null || dataAplicacao.isAfter(existingDetail.getDataAplicacao())) {
+                            return new RevestimentoDetail(navioNome, periodoBase, dataAplicacao);
+                        }
+                        return existingDetail;
+                    });
+                });
+        });
     }
 
     /**
      * Carrega os detalhes físicos e de classe do navio para o mapeamento HPI Dinâmico.
+     * Também busca dados do banco de dados.
      */
     public void loadShipDetails(String filePath) throws IOException {
-
+        // 1. Carregar do CSV (como está hoje)
         try (Reader in = new FileReader(new ClassPathResource(filePath).getFile())) {
-
-            // Headers baseados no CSV fornecido:
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                     .builder()
                     .setHeader("Nome do navio", "Classe", "Tipo", "Porte Bruto", "Comprimento total (m)", "Boca (m)", "Calado (m)", "Pontal (m)")
@@ -163,7 +197,6 @@ public class ModelService {
                     .parse(in);
 
             for (CSVRecord record : records) {
-
                 String shipName = normalizeShipId(record.get("Nome do navio"));
                 String shipClass = record.get("Classe").trim();
                 String cargoType = record.get("Tipo").trim();
@@ -171,17 +204,29 @@ public class ModelService {
                 if (shipName.isEmpty()) continue;
 
                 try {
-                    // Porte Bruto (Deadweight Tonnage) é a chave para a regra HPI
                     double dWT = Double.parseDouble(record.get("Porte Bruto").trim());
-
                     ShipDetail detail = new ShipDetail(shipName, shipClass, cargoType, dWT);
                     shipDetailsMap.put(shipName, detail);
-
                 } catch (NumberFormatException ignored) {
                     // Ignora linhas com Porte Bruto inválido
                 }
             }
         }
+
+        // 2. Carregar do banco de dados e sobrescrever dados do CSV
+        navioRepository.findAll().forEach(navio -> {
+            String navioNome = normalizeShipId(navio.getNome());
+            if (navio.getPorteBruto() != null && navio.getPorteBruto() > 0) {
+                ShipDetail detail = new ShipDetail(
+                    navioNome,
+                    navio.getClasse() != null ? navio.getClasse() : "UNKNOWN",
+                    navio.getTipo() != null ? navio.getTipo() : "UNKNOWN",
+                    navio.getPorteBruto()
+                );
+                shipDetailsMap.put(navioNome, detail);
+            }
+        });
+
         System.out.println("   - Detalhes de " + shipDetailsMap.size() + " navios carregados.");
     }
 
@@ -517,7 +562,22 @@ public class ModelService {
         // Normaliza o nome do navio para MAIÚSCULAS antes da busca
         String normalizedName = normalizeShipId(shipName);
 
-        // Retorna a data do mapa de docagem
+        // 1. Busca no mapa (dados do CSV)
+        LocalDate dateFromMap = lastDockingMap.get(normalizedName);
+        
+        // 2. Busca no banco de dados
+        navioRepository.findByNome(normalizedName)
+            .ifPresent(navio -> {
+                docagemRepository.findUltimaDocagemByNavioId(navio.getId())
+                    .ifPresent(docagem -> {
+                        LocalDate dbDate = docagem.getDataDocagem();
+                        // Se não existe no map ou se a data do banco é mais recente, usar a do banco
+                        if (dateFromMap == null || dbDate.isAfter(dateFromMap)) {
+                            lastDockingMap.put(normalizedName, dbDate);
+                        }
+                    });
+            });
+
         return lastDockingMap.get(normalizedName);
     }
 
@@ -533,11 +593,19 @@ public class ModelService {
     }
 
     public int getPeriodoBaseRevestimento(String navioId) {
-        RevestimentoDetail detail = revestimentosMap.get(navioId.trim());
+        String normalizedName = normalizeShipId(navioId);
+        
+        // 1. Busca no mapa (dados do CSV)
+        RevestimentoDetail detail = revestimentosMap.get(normalizedName);
         if (detail != null) {
             return detail.getPeriodoBaseVerificacao();
         }
-        return 52;// media
+
+        // 2. Busca no banco de dados
+        return navioRepository.findByNome(normalizedName)
+            .flatMap(navio -> revestimentoRepository.findUltimoRevestimentoByNavioId(navio.getId()))
+            .map(rev -> rev.getPeriodoBaseVerificacao())
+            .orElse(52); // média padrão
     }
 
     /**
@@ -545,11 +613,18 @@ public class ModelService {
      * ESSENCIAL para determinarHPILimite no PredictionService.
      */
     public String getShipClassType(String navioId) {
-        String normalizedName = navioId.trim().toUpperCase();
+        String normalizedName = normalizeShipId(navioId);
+        
+        // 1. Busca no mapa (dados do CSV)
         ShipDetail detail = shipDetailsMap.get(normalizedName);
+        if (detail != null) {
+            return detail.getShipClass();
+        }
 
-        // Retorna a Classe (Suezmax, Aframax, etc.) ou um fallback para a lógica HPI
-        return (detail != null) ? detail.getShipClass() : "UNKNOWN";
+        // 2. Busca no banco de dados
+        return navioRepository.findByNome(normalizedName)
+            .map(Navio::getClasse)
+            .orElse("UNKNOWN");
     }
 
 }
