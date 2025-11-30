@@ -7,21 +7,32 @@ import com.hackathonbrasil.transpetro.model.TrainingDataRecord;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.hackathonbrasil.transpetro.model.Navio;
+import com.hackathonbrasil.transpetro.repository.DocagemRepository;
+import com.hackathonbrasil.transpetro.repository.NavioRepository;
+import com.hackathonbrasil.transpetro.repository.RevestimentoRepository;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.math3.stat.regression.OLSMultipleLinearRegression;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 public class ModelService {
+
+    // Constante que define o número total de coeficientes gerados pela regressão.
+    // Atualmente: 6 coeficientes (Intercepto + 5 Features)
+    public static final int NUM_MODEL_COEFFICIENTS = 6; 
+
     // Mapeia NavioID -> Data da Última Docagem
     Map<String, LocalDate> lastDockingMap = new HashMap<>();
     //Mapeia NavioID -> CFI_Limpo (Consumo Ideal Específico)
@@ -31,6 +42,15 @@ public class ModelService {
 
 
     private final Map<String, RevestimentoDetail> revestimentosMap = new HashMap<>();
+
+    @Autowired
+    private NavioRepository navioRepository;
+
+    @Autowired
+    private DocagemRepository docagemRepository;
+
+    @Autowired
+    private RevestimentoRepository revestimentoRepository;
 
     // Constantes de Limites
     private static final int DAYS_POST_CLEANING_START = 3; // Começa a contar a partir do 3º dia
@@ -51,13 +71,11 @@ public class ModelService {
 
     /**
      * Lê o arquivo de docagem e retorna a data de docagem mais recente para cada navio.
+     * Também busca dados do banco de dados.
      */
     private Map<String, LocalDate> loadDockingDates(String filePath) throws IOException {
-
-
+        // 1. Carregar do CSV (como está hoje)
         try (Reader in = new FileReader(new ClassPathResource(filePath).getFile())) {
-
-            // Assumindo cabeçalhos: Navio, Docagem, Tipo
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                     .builder()
                     .setHeader("Navio", "Docagem", "Tipo")
@@ -66,22 +84,34 @@ public class ModelService {
                     .parse(in);
 
             for (CSVRecord record : records) {
-                String shipName = record.get("Navio").trim().toUpperCase();
+                String shipName = normalizeShipId(record.get("Navio"));
                 String dateString = record.get("Docagem").trim();
 
                 if (shipName.isEmpty() || dateString.isEmpty()) continue;
 
-                // Tenta parsear no formato Mês/Dia/Ano (M/D/YYYY)
                 LocalDate dockingDate = parseDockingDate(dateString);
 
                 if (dockingDate != null) {
-                    // Lógica: Mantém apenas a data mais recente
                     lastDockingMap.compute(shipName, (k, existingDate) ->
                         (existingDate == null || dockingDate.isAfter(existingDate)) ? dockingDate : existingDate
                     );
                 }
             }
         }
+
+        // 2. Carregar do banco de dados
+        navioRepository.findAll().forEach(navio -> {
+            String navioNome = normalizeShipId(navio.getNome());
+            docagemRepository.findUltimaDocagemByNavioId(navio.getId())
+                .ifPresent(docagem -> {
+                    LocalDate dataDocagem = docagem.getDataDocagem();
+                    // Se não existe no map ou se a data do banco é mais recente, usar a do banco
+                    lastDockingMap.compute(navioNome, (k, existingDate) ->
+                        (existingDate == null || dataDocagem.isAfter(existingDate)) ? dataDocagem : existingDate
+                    );
+                });
+        });
+
         return lastDockingMap;
     }
 
@@ -106,10 +136,8 @@ public class ModelService {
     }
 
     public void carregarDadosRevestimento(String filePath) throws IOException {
-
+        // 1. Carregar do CSV (como está hoje)
         try (Reader in = new FileReader(new ClassPathResource(filePath).getFile())) {
-
-            // ... (configuração do CSVFormat: verifique se o header reflete todas as colunas) ...
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                 .builder()
                 .setHeader("Sigla", "Nome do navio", "TipoClass", "TipoCarga", "ClasseNum", "Data da aplicacao", "Cr1. Período base de verificação", "Cr1. Parada máxima acumulada no período")
@@ -118,37 +146,49 @@ public class ModelService {
                 .parse(in);
 
             for (CSVRecord record : records) {
-                String shipName = record.get("Nome do navio").trim().toUpperCase();
+                String shipName = normalizeShipId(record.get("Nome do navio"));
                 String dateString = record.get("Data da aplicacao").trim();
                 String periodo = record.get("Cr1. Período base de verificação").trim();
 
-                // Tenta parsear a data de aplicação (formato M/D/YYYY)
                 LocalDate dataAplicacao = parseDockingDate(dateString);
-
                 if (dataAplicacao == null) continue;
 
                 int periodoBase = Integer.parseInt(periodo);
 
-                // CRÍTICO: Atualiza ou insere, mantendo SOMENTE o revestimento com a data de aplicação MAIS RECENTE
                 revestimentosMap.compute(shipName, (k, existingDetail) -> {
                     if (existingDetail == null || dataAplicacao.isAfter(existingDetail.getDataAplicacao())) {
-                        // Novo registro ou registro mais recente encontrado
                         return new RevestimentoDetail(shipName, periodoBase, dataAplicacao);
                     }
-                    return existingDetail; // Mantém o registro existente (mais recente)
+                    return existingDetail;
                 });
             }
         }
+
+        // 2. Carregar do banco de dados
+        navioRepository.findAll().forEach(navio -> {
+            String navioNome = normalizeShipId(navio.getNome());
+            revestimentoRepository.findUltimoRevestimentoByNavioId(navio.getId())
+                .ifPresent(rev -> {
+                    LocalDate dataAplicacao = rev.getDataAplicacao();
+                    int periodoBase = rev.getPeriodoBaseVerificacao();
+                    
+                    revestimentosMap.compute(navioNome, (k, existingDetail) -> {
+                        if (existingDetail == null || dataAplicacao.isAfter(existingDetail.getDataAplicacao())) {
+                            return new RevestimentoDetail(navioNome, periodoBase, dataAplicacao);
+                        }
+                        return existingDetail;
+                    });
+                });
+        });
     }
 
     /**
      * Carrega os detalhes físicos e de classe do navio para o mapeamento HPI Dinâmico.
+     * Também busca dados do banco de dados.
      */
     public void loadShipDetails(String filePath) throws IOException {
-
+        // 1. Carregar do CSV (como está hoje)
         try (Reader in = new FileReader(new ClassPathResource(filePath).getFile())) {
-
-            // Headers baseados no CSV fornecido:
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                     .builder()
                     .setHeader("Nome do navio", "Classe", "Tipo", "Porte Bruto", "Comprimento total (m)", "Boca (m)", "Calado (m)", "Pontal (m)")
@@ -157,25 +197,36 @@ public class ModelService {
                     .parse(in);
 
             for (CSVRecord record : records) {
-
-                String shipName = record.get("Nome do navio").trim().toUpperCase();
+                String shipName = normalizeShipId(record.get("Nome do navio"));
                 String shipClass = record.get("Classe").trim();
                 String cargoType = record.get("Tipo").trim();
 
                 if (shipName.isEmpty()) continue;
 
                 try {
-                    // Porte Bruto (Deadweight Tonnage) é a chave para a regra HPI
                     double dWT = Double.parseDouble(record.get("Porte Bruto").trim());
-
                     ShipDetail detail = new ShipDetail(shipName, shipClass, cargoType, dWT);
                     shipDetailsMap.put(shipName, detail);
-
                 } catch (NumberFormatException ignored) {
                     // Ignora linhas com Porte Bruto inválido
                 }
             }
         }
+
+        // 2. Carregar do banco de dados e sobrescrever dados do CSV
+        navioRepository.findAll().forEach(navio -> {
+            String navioNome = normalizeShipId(navio.getNome());
+            if (navio.getPorteBruto() != null && navio.getPorteBruto() > 0) {
+                ShipDetail detail = new ShipDetail(
+                    navioNome,
+                    navio.getClasse() != null ? navio.getClasse() : "UNKNOWN",
+                    navio.getTipo() != null ? navio.getTipo() : "UNKNOWN",
+                    navio.getPorteBruto()
+                );
+                shipDetailsMap.put(navioNome, detail);
+            }
+        });
+
         System.out.println("   - Detalhes de " + shipDetailsMap.size() + " navios carregados.");
     }
 
@@ -284,10 +335,24 @@ public class ModelService {
                         double fwdDraft = Double.parseDouble(record.get("fwdDraft").trim());
                         double displacement = Double.parseDouble(record.get("displacement").trim());
                         double duration = Double.parseDouble(record.get("duration").trim());
-                        int beaufortScale = Integer.parseInt(record.get("beaufortScale").trim());
+                        String beaufortScaleStr = record.get("beaufortScale").trim();
+                        String beaufortDesc = record.get("beaufortScaleDesc").trim();
+
+                        int beaufortScale = 0;
+                        try {
+                            // Tenta ler o valor
+                            beaufortScale = Integer.parseInt(beaufortScaleStr);
+                        } catch (NumberFormatException ignored) {
+                            if (!beaufortDesc.isEmpty() && beaufortDesc.matches("^\\d+[\\s-].*")) {
+                                try {
+                                    beaufortScale = Integer.parseInt(beaufortDesc.substring(0, 1));
+                                } catch (Exception e2) {
+                                }
+                            }
+                        }
 
                         ConsolidatedRecord rec = new ConsolidatedRecord(
-                            sessionId, record.get("shipName").trim().toUpperCase(), record.get("class"), record.get("eventName"), record.get("startGMTDate"),
+                            sessionId, normalizeShipId(record.get("shipName")), record.get("class"), record.get("eventName"), record.get("startGMTDate"),
                             consumptionMap.get(sessionId), duration, speed, aftDraft, fwdDraft, displacement, beaufortScale
                         );
 
@@ -319,7 +384,7 @@ public class ModelService {
 
             // 1. CALCULAR DIAS DESDE LIMPEZA (X1)
             LocalDate eventDate = parseDate(rec.getStartGMTDate());
-            LocalDate lastCleaningDate = lastCleaningMap.get(rec.getShipName());
+            LocalDate lastCleaningDate = lastCleaningMap.get(normalizeShipId(rec.getShipName()));
 
             if (lastCleaningDate == null || eventDate == null || eventDate.isBefore(lastCleaningDate)) {
                 continue;
@@ -333,7 +398,7 @@ public class ModelService {
             double dailyConsumption = rec.getConsumedQuantity() / (rec.getDuration() / 24.0);
 
             // Consumo de Referência: Usar o CFI Limpo ESPECÍFICO do navio.
-            double cfiCleanSpec = getCfiCleanTonPerDay(rec.getShipName());
+            double cfiCleanSpec = getCfiCleanTonPerDay(normalizeShipId(rec.getShipName()));
 
             // HPI é a razão entre o consumo real e o consumo de referência para uma condição limpa.
             // Se o CFI específico não for encontrado, getCfiCleanTonPerDay retorna a média da frota (FALLBACK_CFI)
@@ -349,10 +414,10 @@ public class ModelService {
             // Features de Controle (X2, X3)
             tdr.setTrimAjustado(rec.getAftDraft() - rec.getFwdDraft()); // TRIM
             tdr.setDeslocamento(rec.getDisplacement());
-            // tdr.setBeaufortScaleNumeric(rec.getBeaufortScale()); // X4, se quiser adicionar
+            tdr.setBeaufortScaleNumeric(rec.getBeaufortScale()); // X4, se quiser adicionar
 
             // Adicionar features Dummy para classes de navio se necessário
-            // tdr.setClasseAframaxDummy(rec.getClassType().equals("Aframax") ? 1 : 0);
+            tdr.setClasseAframaxDummy(rec.getClassType().equals("Aframax") ? 1 : 0);
 
             trainingData.add(tdr);
         }
@@ -377,13 +442,13 @@ public class ModelService {
      * ETAPA 3: Prepara os arrays e treina o modelo.
      */
     private void trainModel(List<TrainingDataRecord> trainingData) {
-        // Seus 3 preditores são: Dias Desde Limpeza, TRIM Ajustado e Deslocamento
-        final int NUM_FEATURES = 3;
+        // Seus 4 preditores são: Dias Desde Limpeza, TRIM Ajustado, Deslocamento e BeaufortScale
+        final int NUM_FEATURES = NUM_MODEL_COEFFICIENTS - 1;
 
         if (trainingData.size() < NUM_FEATURES + 2) {
-             System.err.println("   - Dados insuficientes para treinamento. Mínimo: " + (NUM_FEATURES + 2) + " registros.");
-             this.trainedModel = null;
-             return;
+            System.err.println("   - Dados insuficientes para treinamento. Mínimo: " + (NUM_FEATURES + 2) + " registros.");
+            this.trainedModel = null;
+            return;
         }
 
         // Y (Variável Dependente): HPI
@@ -394,9 +459,12 @@ public class ModelService {
 
         for (int i = 0; i < trainingData.size(); i++) {
             TrainingDataRecord tdr = trainingData.get(i);
-            x[i][0] = tdr.getDiasDesdeLimpeza();
-            x[i][1] = tdr.getTrimAjustado();
-            x[i][2] = tdr.getDeslocamento();
+
+            x[i][0] = tdr.getDiasDesdeLimpeza();       // X1: Dias Desde Limpeza
+            x[i][1] = tdr.getTrimAjustado();           // X2: TRIM
+            x[i][2] = tdr.getDeslocamento();           // X3: Deslocamento
+            x[i][3] = tdr.getBeaufortScaleNumeric();   // X4: Escala Beaufort
+            x[i][4] = (double) tdr.getClasseAframaxDummy(); // X5: Aframax Dummy 
         }
 
         try {
@@ -410,6 +478,8 @@ public class ModelService {
             System.out.println("     Dias Limpeza: " + String.format("%.6f", coefficients[1]));
             System.out.println("     TRIM: " + String.format("%.4f", coefficients[2]));
             System.out.println("     Deslocamento: " + String.format("%.6f", coefficients[3]));
+            System.out.println("     Beaufort Scale: " + String.format("%.4f", coefficients[4]));
+            System.out.println("     Aframax Dummy: " + String.format("%.4f", coefficients[5])); 
 
         } catch (Exception e) {
             System.err.println("   - Erro fatal durante o cálculo da Regressão: " + e.getMessage());
@@ -429,7 +499,7 @@ public class ModelService {
         for (ConsolidatedRecord rec : rawData) {
 
             LocalDate eventDate = parseDate(rec.getStartGMTDate());
-            LocalDate lastCleaningDate = lastDockingMap.get(rec.getShipName());
+            LocalDate lastCleaningDate = lastDockingMap.get(normalizeShipId(rec.getShipName()));
 
             if (lastCleaningDate == null || eventDate == null || eventDate.isBefore(lastCleaningDate)) {
                 continue;
@@ -445,14 +515,14 @@ public class ModelService {
 
                 // Armazena o consumo por navio
                 shipConsumptionPostClean
-                    .computeIfAbsent(rec.getShipName(), k -> new ArrayList<>())
+                    .computeIfAbsent(normalizeShipId(rec.getShipName()), k -> new ArrayList<>())
                     .add(dailyConsumption);
             }
         }
 
         // 2. Calcula a média (CFI_Limpo) para cada navio
         for (Map.Entry<String, List<Double>> entry : shipConsumptionPostClean.entrySet()) {
-            String shipName = entry.getKey();
+            String shipName = normalizeShipId(entry.getKey());
             List<Double> consumptions = entry.getValue();
 
             if (!consumptions.isEmpty()) {
@@ -464,11 +534,50 @@ public class ModelService {
         System.out.println("   - CFI_Limpo calculado para " + cfiCleanMap.size() + " navios (usando dias " + DAYS_POST_CLEANING_START + "-" + DAYS_POST_CLEANING_END + ").");
     }
 
+    public String normalizeShipId(String shipId) {
+        if (shipId == null || shipId.isEmpty()) {
+            return "";
+        }
+
+        // 1. Normaliza para o formato NFD (Canonical Decomposition)
+        String normalized = Normalizer.normalize(shipId.trim().toUpperCase(), Normalizer.Form.NFD);
+
+        // 2. Remove todos os caracteres diacríticos (acentos, cedilha, til)
+        // O regex \\p{InCombiningDiacriticalMarks}+ remove todos os caracteres de marcação combinada.
+        normalized = normalized.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+
+        // 3. Opcional: Remove caracteres que não sejam letras, números ou espaços (se necessário)
+        // Se o nome puder conter traços ou pontos, ajuste este regex.
+        // Para simplificação, focaremos apenas em letras e números.
+        // Exemplo: Substituir outros caracteres não essenciais por espaço ou remover
+        // normalized = normalized.replaceAll("[^A-Z0-9 ]", "");
+
+        // 4. Substitui espaços múltiplos por um único espaço
+        normalized = normalized.replaceAll("\\s+", " ").trim();
+
+        return normalized;
+    }
+
     public LocalDate getLastCleaningDate(String shipName) {
         // Normaliza o nome do navio para MAIÚSCULAS antes da busca
-        String normalizedName = shipName.trim().toUpperCase();
+        String normalizedName = normalizeShipId(shipName);
 
-        // Retorna a data do mapa de docagem
+        // 1. Busca no mapa (dados do CSV)
+        LocalDate dateFromMap = lastDockingMap.get(normalizedName);
+        
+        // 2. Busca no banco de dados
+        navioRepository.findByNome(normalizedName)
+            .ifPresent(navio -> {
+                docagemRepository.findUltimaDocagemByNavioId(navio.getId())
+                    .ifPresent(docagem -> {
+                        LocalDate dbDate = docagem.getDataDocagem();
+                        // Se não existe no map ou se a data do banco é mais recente, usar a do banco
+                        if (dateFromMap == null || dbDate.isAfter(dateFromMap)) {
+                            lastDockingMap.put(normalizedName, dbDate);
+                        }
+                    });
+            });
+
         return lastDockingMap.get(normalizedName);
     }
 
@@ -477,18 +586,26 @@ public class ModelService {
      * Se não encontrado no mapa, retorna o FALLBACK_CFI.
      */
     public double getCfiCleanTonPerDay(String shipName) {
-        String normalizedName = shipName.trim().toUpperCase();
+        String normalizedName = normalizeShipId(shipName);
 
         // Retorna o valor específico ou o FALLBACK, se não houver dados limpos
         return cfiCleanMap.getOrDefault(normalizedName, FALLBACK_CFI);
     }
 
     public int getPeriodoBaseRevestimento(String navioId) {
-        RevestimentoDetail detail = revestimentosMap.get(navioId.trim());
+        String normalizedName = normalizeShipId(navioId);
+        
+        // 1. Busca no mapa (dados do CSV)
+        RevestimentoDetail detail = revestimentosMap.get(normalizedName);
         if (detail != null) {
             return detail.getPeriodoBaseVerificacao();
         }
-        return 52;// media
+
+        // 2. Busca no banco de dados
+        return navioRepository.findByNome(normalizedName)
+            .flatMap(navio -> revestimentoRepository.findUltimoRevestimentoByNavioId(navio.getId()))
+            .map(rev -> rev.getPeriodoBaseVerificacao())
+            .orElse(52); // média padrão
     }
 
     /**
@@ -496,11 +613,18 @@ public class ModelService {
      * ESSENCIAL para determinarHPILimite no PredictionService.
      */
     public String getShipClassType(String navioId) {
-        String normalizedName = navioId.trim().toUpperCase();
+        String normalizedName = normalizeShipId(navioId);
+        
+        // 1. Busca no mapa (dados do CSV)
         ShipDetail detail = shipDetailsMap.get(normalizedName);
+        if (detail != null) {
+            return detail.getShipClass();
+        }
 
-        // Retorna a Classe (Suezmax, Aframax, etc.) ou um fallback para a lógica HPI
-        return (detail != null) ? detail.getShipClass() : "UNKNOWN";
+        // 2. Busca no banco de dados
+        return navioRepository.findByNome(normalizedName)
+            .map(Navio::getClasse)
+            .orElse("UNKNOWN");
     }
 
 }

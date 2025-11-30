@@ -31,7 +31,7 @@ public class PredictionService {
     private static final double HPI_ACCEPTABLE_MAX_CLEAN = 1.030; // 3% de perda é o máximo aceitável para um casco "limpo" (Ponto de corte entre Nível 1 e 2)
 
     private double[] adjustCoefficients(double[] rawCoefficients) {
-        if (rawCoefficients.length < 4) {
+        if (rawCoefficients.length < ModelService.NUM_MODEL_COEFFICIENTS) {
             // Lógica de fallback mantida (se o array for muito curto)
             return rawCoefficients;
         }
@@ -146,14 +146,14 @@ public class PredictionService {
             // Nível 2: [1.0%, 15.0%]
             coverage = linearMap(hpi, 1.025, 1.050, 1.0, 15.0);
 
-        } else if (hpi <= 1.100) {
+        } else if (hpi <= HPI_LEVEL_4_START) {
             // Nível 3: [15.0%, 40.0%]
-            coverage = linearMap(hpi, 1.050, 1.100, 15.0, 40.0);
+            coverage = linearMap(hpi, 1.050, HPI_LEVEL_4_START, 15.0, 40.0);
 
         } else {
             // Nível 4: [40.0%, 100.0%]
             double maxHpi = 1.200;
-            coverage = linearMap(hpi, 1.100, maxHpi, 40.0, 100.0);
+            coverage = linearMap(hpi, HPI_LEVEL_4_START, maxHpi, 40.0, 100.0);
             coverage = Math.min(coverage, 100.0);
         }
 
@@ -165,7 +165,7 @@ public class PredictionService {
     // --- MÉTODO PRINCIPAL DE PREVISÃO ---
 
     public CleaningSuggestionDto suggestCleaningDate(String navioId) {
-        navioId = navioId.trim().toUpperCase(); // Garante que o navioId esteja em maiúsculas
+        navioId = modelService.normalizeShipId(navioId); // Garante que o navioId esteja em maiúsculas
 
         double cfiCleanTonPerDay = modelService.getCfiCleanTonPerDay(navioId);
         LocalDate ultimaLimpeza = modelService.getLastCleaningDate(navioId);
@@ -193,9 +193,10 @@ public class PredictionService {
         double[] rawCoefficients = model.estimateRegressionParameters();
 
         // Lógica de tratamento/ajuste de coeficientes (sua lógica mantida)
-        if (rawCoefficients.length < 4) {
+        if (rawCoefficients.length < ModelService.NUM_MODEL_COEFFICIENTS) {
             double coefDiasFallback = rawCoefficients.length > 1 ? rawCoefficients[1] : DEFAULT_DEGRADATION_RATE;
             double coefAjustado = coefDiasFallback > 0 ? coefDiasFallback : DEFAULT_DEGRADATION_RATE;
+            System.out.println("❌ ERRO: Modelo treinado com número insuficiente de coeficientes (" + rawCoefficients.length + "). Usando Fallback.");
             rawCoefficients = new double[] {rawCoefficients[0], coefAjustado, 0.0, 0.0};
         }
         double[] coefficients = adjustCoefficients(rawCoefficients);
@@ -205,8 +206,13 @@ public class PredictionService {
         // Variáveis de controle de regressão são consideradas zero na projeção futura
         double betaTrim = coefficients[2];
         double betaDeslocamento = coefficients[3];
+        double betaBeaufort = coefficients[4];
+        double betaAframax = coefficients[5];
         double trimFuture = 0.0;
         double deslocamentoFuture = 0.0;
+        double beaufortFuture = 0.0;
+        String shipClass = modelService.getShipClassType(navioId);
+        double aframaxDummyFuture = shipClass.contains("Aframax") ? 1.0 : 0.0;
 
         LocalDate dataHoje = LocalDate.now();
         long daysSinceLastCleaning = ChronoUnit.DAYS.between(ultimaLimpeza, dataHoje);
@@ -215,7 +221,9 @@ public class PredictionService {
         double initialHPI = intercept
                         + (betaDays * daysSinceLastCleaning)
                         + (betaTrim * trimFuture)
-                        + (betaDeslocamento * deslocamentoFuture);
+                        + (betaDeslocamento * deslocamentoFuture)
+                        + (betaBeaufort * beaufortFuture)
+                        + (betaAframax * aframaxDummyFuture);
 
         double predictedHPI = Math.max(1.0, initialHPI);
 
@@ -228,14 +236,23 @@ public class PredictionService {
         double maxExtraFuel = initialPrediction.getExtraFuelTonPerDay();
         LocalDate dataIdeal = null; // Data do gatilho
 
+        if (initialHPI >= HPI_THRESHOLD_DINAMICO) {
+            dataIdeal = dataHoje;
+        }
+
         // --- 4. Simulação e Projeção Diária (Começa a partir de amanhã) ---
         long maxDays = daysSinceLastCleaning + MAX_PROJECTION_DAYS;
 
         for (long days = daysSinceLastCleaning + 1; days < maxDays; days++) {
             LocalDate predictionDate = ultimaLimpeza.plusDays(days);
 
-            // PREVISÃO DO HPI (Assumindo TRIM e Deslocamento médios/zero para a projeção)
-            double calculatedHPI = intercept + (betaDays * days);
+            // PREVISÃO DO HPI
+            double calculatedHPI = intercept
+                                 + (betaDays * days)
+                                 + (betaTrim * trimFuture)
+                                 + (betaDeslocamento * deslocamentoFuture)
+                                 + (betaBeaufort * beaufortFuture)
+                                 + (betaAframax * aframaxDummyFuture);
             predictedHPI = Math.max(1.0, calculatedHPI);
 
             DailyPredictionDto prediction = new DailyPredictionDto(predictionDate, predictedHPI,0d,0d,getEstimatedIncrustationCoverageGranular(predictedHPI));
@@ -248,7 +265,7 @@ public class PredictionService {
             }
 
             // --- VERIFICAÇÃO DO LIMITE DINÂMICO (Gatilho de Limpeza) ---
-            if (predictedHPI >= HPI_THRESHOLD_DINAMICO) {
+            if (dataIdeal == null && predictedHPI >= HPI_THRESHOLD_DINAMICO) {
                 dataIdeal = predictionDate;
                 // break; // Atingiu o limite, para a projeção
             }
@@ -267,6 +284,8 @@ public class PredictionService {
                             + String.format("%.3f", HPI_THRESHOLD_DINAMICO) + ") dentro de " + MAX_PROJECTION_DAYS + " dias.";
         }
 
+        double porcentagemComprometimentoAtual = initialPrediction.getEstimatedIncrustationCoverage();
+
         return new CleaningSuggestionDto(
             navioId,
             ultimaLimpeza,
@@ -277,6 +296,7 @@ public class PredictionService {
             nivelAtual,
             cfiCleanTonPerDay,
             maxExtraFuel,
+            porcentagemComprometimentoAtual,
             predictions
         );
     }
@@ -293,6 +313,7 @@ public class PredictionService {
             getStatusDescricao(nivel),
             nivel,
             cfiCleanTonPerDay,
+            0.0,
             0.0,
             predictions
         );
