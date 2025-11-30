@@ -165,40 +165,44 @@ public class PredictionService {
     // --- MÉTODO PRINCIPAL DE PREVISÃO ---
 
     public CleaningSuggestionDto suggestCleaningDate(String navioId) {
-        navioId = navioId.toString().toUpperCase();
+        navioId = navioId.trim().toUpperCase(); // Garante que o navioId esteja em maiúsculas
 
-        double cfiCleanTonPerDay = modelService.getCfiCleanTonPerDay(navioId); // OBTÉM CFI CLEAN
+        double cfiCleanTonPerDay = modelService.getCfiCleanTonPerDay(navioId);
         LocalDate ultimaLimpeza = modelService.getLastCleaningDate(navioId);
 
         if (ultimaLimpeza == null) {
-            return buildFallbackDto(navioId, "Data da última docagem não encontrada para o navio.", 1.0, new ArrayList<>(), cfiCleanTonPerDay); // Ajustado para CFI
+            return buildFallbackDto(navioId, "Data da última docagem não encontrada para o navio.", 1.0, new ArrayList<>(), cfiCleanTonPerDay);
         }
 
         OLSMultipleLinearRegression model = modelService.getTrainedModel();
-        List<DailyPredictionDto> predictions = new ArrayList<>();
-        LocalDate dataIdeal = null;
-        double predictedHPI = 0.0;
-        double maxExtraFuel = 0.0;
-
         if (model == null) {
-            return buildFallbackDto(navioId, "Modelo de ML não treinado ou indisponível.", 1.0, predictions, cfiCleanTonPerDay); // Ajustado para CFI
+            return buildFallbackDto(navioId, "Modelo de ML não treinado ou indisponível.", 1.0, new ArrayList<>(), cfiCleanTonPerDay);
         }
 
-        // 2. Obter e AJUSTAR os coeficientes
+        // --- 1. CONFIGURAÇÃO DO GATILHO DINÂMICO ---
+        String tipoCarga = modelService.getShipClassType(navioId);
+        if (tipoCarga == null || tipoCarga.isEmpty()) {
+            tipoCarga = "UNKNOWN";
+        }
+
+        // Calcula o LIMITE DINÂMICO UMA ÚNICA VEZ antes de começar a projeção
+        final double HPI_THRESHOLD_DINAMICO = determinarHPILimite(navioId, tipoCarga);
+        System.out.println("✅ HPI Limite Dinâmico para " + navioId + ": " + String.format("%.3f", HPI_THRESHOLD_DINAMICO));
+
+        // --- 2. PREPARAÇÃO DA PREDIÇÃO ---
         double[] rawCoefficients = model.estimateRegressionParameters();
 
-        // 3. Tratamento de coeficientes (Se rawCoefficients.length < 4) - SUA LÓGICA MANTIDA
+        // Lógica de tratamento/ajuste de coeficientes (sua lógica mantida)
         if (rawCoefficients.length < 4) {
             double coefDiasFallback = rawCoefficients.length > 1 ? rawCoefficients[1] : DEFAULT_DEGRADATION_RATE;
             double coefAjustado = coefDiasFallback > 0 ? coefDiasFallback : DEFAULT_DEGRADATION_RATE;
             rawCoefficients = new double[] {rawCoefficients[0], coefAjustado, 0.0, 0.0};
         }
-
         double[] coefficients = adjustCoefficients(rawCoefficients);
 
-        // --- Variáveis de Regressão (Ajustadas) ---
         double intercept = coefficients[0];
         double betaDays = coefficients[1];
+        // Variáveis de controle de regressão são consideradas zero na projeção futura
         double betaTrim = coefficients[2];
         double betaDeslocamento = coefficients[3];
         double trimFuture = 0.0;
@@ -213,27 +217,27 @@ public class PredictionService {
                         + (betaTrim * trimFuture)
                         + (betaDeslocamento * deslocamentoFuture);
 
-        predictedHPI = Math.max(1.0, initialHPI);
+        double predictedHPI = Math.max(1.0, initialHPI);
 
         // --- 3. PONTO INICIAL (HOJE) ---
-        // CRIA A PREVISÃO INICIAL, CALCULA AS MÉTRICAS E ADICIONA À LISTA
         DailyPredictionDto initialPrediction = new DailyPredictionDto(dataHoje, predictedHPI,0d,0d,getEstimatedIncrustationCoverageGranular(predictedHPI));
         calculatePerformanceMetrics(initialPrediction, cfiCleanTonPerDay);
-        predictions.add(initialPrediction); // ADICIONADO UMA ÚNICA VEZ
-        maxExtraFuel = initialPrediction.getExtraFuelTonPerDay();
 
+        List<DailyPredictionDto> predictions = new ArrayList<>();
+        predictions.add(initialPrediction);
+        double maxExtraFuel = initialPrediction.getExtraFuelTonPerDay();
+        LocalDate dataIdeal = null; // Data do gatilho
 
-        // 4. Simulação e Projeção Diária (Começa a partir de amanhã)
+        // --- 4. Simulação e Projeção Diária (Começa a partir de amanhã) ---
         long maxDays = daysSinceLastCleaning + MAX_PROJECTION_DAYS;
 
         for (long days = daysSinceLastCleaning + 1; days < maxDays; days++) {
             LocalDate predictionDate = ultimaLimpeza.plusDays(days);
 
-            // --- PREVISÃO DO HPI ---
+            // PREVISÃO DO HPI (Assumindo TRIM e Deslocamento médios/zero para a projeção)
             double calculatedHPI = intercept + (betaDays * days);
             predictedHPI = Math.max(1.0, calculatedHPI);
 
-            // CRIA, CALCULA MÉTRICAS E ADICIONA À LISTA
             DailyPredictionDto prediction = new DailyPredictionDto(predictionDate, predictedHPI,0d,0d,getEstimatedIncrustationCoverageGranular(predictedHPI));
             calculatePerformanceMetrics(prediction, cfiCleanTonPerDay);
 
@@ -243,36 +247,32 @@ public class PredictionService {
                 maxExtraFuel = prediction.getExtraFuelTonPerDay();
             }
 
-            // --- VERIFICAÇÃO DO LIMITE DE PERFORMANCE ---
-            if (dataIdeal == null && predictedHPI >= HPI_LIMITE_DECISAO) {
+            // --- VERIFICAÇÃO DO LIMITE DINÂMICO (Gatilho de Limpeza) ---
+            if (predictedHPI >= HPI_THRESHOLD_DINAMICO) {
                 dataIdeal = predictionDate;
-            }
-
-            if (dataIdeal == null && predictedHPI >= HPI_THRESHOLD) {
-                // Atribui o PRIMEIRO dia que atingiu o limite de limpeza
-                dataIdeal = predictionDate;
-                break;
+                // break; // Atingiu o limite, para a projeção
             }
         }
 
-        // 5. Montagem do DTO Final
+        // --- 5. Montagem do DTO Final ---
         int nivelAtual = getNivelBioincrustacao(initialHPI);
         String statusDescricaoAtual = getStatusDescricao(nivelAtual);
 
-        String justificativa;
+        String justificativaFinal;
         if (dataIdeal != null) {
-            justificativa = "HPI projetado atingiu o limite de " + HPI_LIMITE_DECISAO + " na data sugerida.";
-            justificativa = "Data de limpeza sugerida: HPI projetado atingiu o limite de performance.";
+            justificativaFinal = "Data de limpeza sugerida: HPI projetado atingiu o limite de performance dinâmico ("
+                            + String.format("%.3f", HPI_THRESHOLD_DINAMICO) + ") em " + dataIdeal + ".";
         } else {
-            justificativa = "HPI projetado (" + String.format("%.2f", predictedHPI) + ") não atingiu o limite dentro de 180 dias de projeção.";
+            justificativaFinal = "HPI projetado (" + String.format("%.3f", predictedHPI) + ") não atingiu o limite ("
+                            + String.format("%.3f", HPI_THRESHOLD_DINAMICO) + ") dentro de " + MAX_PROJECTION_DAYS + " dias.";
         }
 
         return new CleaningSuggestionDto(
             navioId,
             ultimaLimpeza,
             dataIdeal,
-            ChronoUnit.DAYS.between(ultimaLimpeza, dataIdeal),
-            justificativa,
+            dataIdeal != null ? ChronoUnit.DAYS.between(ultimaLimpeza, dataIdeal) : 0L, // Calcula os dias se houver data
+            justificativaFinal,
             statusDescricaoAtual,
             nivelAtual,
             cfiCleanTonPerDay,
@@ -312,5 +312,37 @@ public class PredictionService {
         // 2. Consumo Diário Extra de Combustível (Daily Extra Fuel)
         double extraFuelTonPerDay = cfiCleanTonPerDay * (hpi - 1.0);
         prediction.setExtraFuelTonPerDay(Math.max(0.0, extraFuelTonPerDay));
+    }
+
+    public double determinarHPILimite(String navioId, String tipoCarga) {
+        double hpiBase;
+
+        // 1. DEFINE O HPI BASE PELA CLASSE (Derivado do Porte Bruto)
+        if (tipoCarga.contains("Suezmax")) {
+            hpiBase = 1.030;
+        } else if (tipoCarga.contains("Aframax")) {
+            hpiBase = 1.025;
+        } else if (tipoCarga.contains("Product carrier")) {
+            hpiBase = 1.020;
+        } else if (tipoCarga.contains("Gaseiro")) {
+            hpiBase = 1.028;
+        } else {
+            hpiBase = 1.0275; // Valor de fallback HPI_THRESHOLD
+        }
+
+        // 2. BUSCA O PERÍODO BASE DO REVESTIMENTO (Dado do CSV)
+        int periodoBase = modelService.getPeriodoBaseRevestimento(navioId);
+
+        // 3. APLICA AJUSTE FINO COM BASE NA QUALIDADE DO REVESTIMENTO
+        if (periodoBase <= 35) { // Curto Período Base (Revestimento Padrão)
+            // Reduz a tolerância (HPI Limite fica mais rigoroso)
+            return hpiBase - 0.005;
+        } else if (periodoBase >= 120) { // Longo Período Base (Revestimento Premium)
+            // Aumenta a tolerância (HPI Limite fica mais alto)
+            return hpiBase + 0.005;
+        } else {
+            // Usa o HPI Base da Classe
+            return hpiBase;
+        }
     }
 }
