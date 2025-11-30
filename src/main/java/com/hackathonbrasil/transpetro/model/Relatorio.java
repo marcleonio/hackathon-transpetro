@@ -19,55 +19,62 @@ public class Relatorio {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 100)
-    private String navioId;
+    // Identificação
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "navio_id")
+    private Navio navio;
 
-    @Column(nullable = false, length = 50)
-    private String tipoRelatorio;
+    @Column(name = "navio_nome", length = 100)
+    private String navioId;              // Nome do navio (ex: "RAFAEL SANTOS") - mantido para compatibilidade
 
     @Column(nullable = false)
-    private LocalDateTime dataRegistro;
+    private String tipoRelatorio;        // INSPECAO, LIMPEZA, OBSERVACAO, CONSUMO
 
-    @Column(nullable = false, length = 100)
-    private String registradoPor;
+    @Column(nullable = false)
+    private LocalDateTime dataRegistro;  // Data/hora do registro
 
-    @Column(nullable = false, length = 200)
-    private String titulo;
+    @Column(nullable = false)
+    private String registradoPor;        // Nome/ID do marinheiro que registrou
 
-    @Column(columnDefinition = "TEXT")
-    private String descricao;
-
-    @Column(length = 100)
-    private String localizacao;
-
-    @Column
-    private Integer nivelBioincrustacao;
-
-    @Column
-    private Double consumoObservado;
-
-    @Column(length = 50)
-    private String tipoLimpeza;
-
-    @Column
-    private LocalDate dataLimpeza;
-
-    @Column(nullable = false, length = 20)
-    private String status;
+    // Dados do Relatório
+    @Column(nullable = false)
+    private String titulo;               // Título do relatório
 
     @Column(columnDefinition = "TEXT")
-    private String anexos;
+    private String descricao;            // Descrição detalhada
 
-    @Column(length = 100)
-    private String coordenadas;
+    private String localizacao;          // Localização no navio (ex: "Proa", "Bombordo", "Casco completo")
+
+    // Dados Técnicos (opcionais, dependendo do tipo)
+    @Column(name = "nivel_bioincrustacao")
+    private Integer nivelBioincrustacao; // 0-4 (se aplicável)
+
+    @Column(name = "consumo_observado")
+    private Double consumoObservado;     // Consumo observado (se tipo = CONSUMO)
+
+    @Column(name = "tipo_limpeza")
+    private String tipoLimpeza;          // "Parcial", "Completa", "Em Docagem" (se tipo = LIMPEZA)
+
+    @Column(name = "data_limpeza")
+    private LocalDate dataLimpeza;       // Data da limpeza (se tipo = LIMPEZA)
+
+    // Metadados
+    @Column(nullable = false)
+    private String status;               // "RASCUNHO", "FINALIZADO", "ARQUIVADO"
 
     @Column(columnDefinition = "TEXT")
+    private String anexos;               // URLs ou paths de fotos/documentos (JSON array)
+
+    private String coordenadas;          // Lat/Long se relevante
+
+    @Column(name = "observacoes_adicionais", columnDefinition = "TEXT")
     private String observacoesAdicionais;
 
-    @Column(nullable = false, updatable = false)
+    // Auditoria
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(nullable = false)
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @PrePersist
