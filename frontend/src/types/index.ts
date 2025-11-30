@@ -16,6 +16,7 @@ export interface CleaningSuggestion {
   nivelBioincrustacao: number;
   cfiCleanTonPerDay: number;
   maxExtraFuelTonPerDay: number;
+  porcentagemComprometimentoAtual: number;
   predictions: DailyPrediction[];
 }
 
