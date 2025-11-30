@@ -2,8 +2,10 @@ package com.hackathonbrasil.transpetro.controller;
 
 import com.hackathonbrasil.transpetro.model.EventoNavegacaoRequestDto;
 import com.hackathonbrasil.transpetro.model.EventoNavegacaoResponseDto;
+import com.hackathonbrasil.transpetro.model.PageResponseDto;
 import com.hackathonbrasil.transpetro.service.EventoNavegacaoService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -22,10 +24,17 @@ public class EventoNavegacaoController {
     @Autowired
     private EventoNavegacaoService eventoService;
 
-    @Operation(summary = "Listar todos os eventos")
+    @Operation(summary = "Listar todos os eventos (paginado)",
+               description = "Retorna eventos paginados. Use page e size para controlar a paginação.")
     @GetMapping
-    public ResponseEntity<List<EventoNavegacaoResponseDto>> listarTodos() {
-        return ResponseEntity.ok(eventoService.listarTodos());
+    public ResponseEntity<PageResponseDto<EventoNavegacaoResponseDto>> listarTodos(
+            @Parameter(description = "Número da página (começa em 0)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Tamanho da página (máximo recomendado: 100)", example = "20")
+            @RequestParam(defaultValue = "20") int size) {
+        // Limita o tamanho máximo da página para evitar sobrecarga
+        if (size > 100) size = 100;
+        return ResponseEntity.ok(eventoService.listarTodos(page, size));
     }
 
     @Operation(summary = "Buscar evento por ID")
@@ -38,19 +47,32 @@ public class EventoNavegacaoController {
         }
     }
 
-    @Operation(summary = "Listar eventos por navio")
+    @Operation(summary = "Listar eventos por navio (paginado)")
     @GetMapping("/navio/{navioId}")
-    public ResponseEntity<List<EventoNavegacaoResponseDto>> listarPorNavio(@PathVariable Long navioId) {
-        return ResponseEntity.ok(eventoService.listarPorNavio(navioId));
+    public ResponseEntity<PageResponseDto<EventoNavegacaoResponseDto>> listarPorNavio(
+            @PathVariable Long navioId,
+            @Parameter(description = "Número da página (começa em 0)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Tamanho da página (máximo recomendado: 100)", example = "20")
+            @RequestParam(defaultValue = "20") int size) {
+        if (size > 100) size = 100;
+        return ResponseEntity.ok(eventoService.listarPorNavio(navioId, page, size));
     }
 
-    @Operation(summary = "Listar eventos por período")
+    @Operation(summary = "Listar eventos por período (paginado)")
     @GetMapping("/navio/{navioId}/periodo")
-    public ResponseEntity<List<EventoNavegacaoResponseDto>> listarPorPeriodo(
+    public ResponseEntity<PageResponseDto<EventoNavegacaoResponseDto>> listarPorPeriodo(
             @PathVariable Long navioId,
+            @Parameter(description = "Data de início (formato: yyyy-MM-ddTHH:mm:ss)")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
-        return ResponseEntity.ok(eventoService.listarPorPeriodo(navioId, start, end));
+            @Parameter(description = "Data de fim (formato: yyyy-MM-ddTHH:mm:ss)")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end,
+            @Parameter(description = "Número da página (começa em 0)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Tamanho da página (máximo recomendado: 100)", example = "20")
+            @RequestParam(defaultValue = "20") int size) {
+        if (size > 100) size = 100;
+        return ResponseEntity.ok(eventoService.listarPorPeriodo(navioId, start, end, page, size));
     }
 
     @Operation(summary = "Criar novo evento")

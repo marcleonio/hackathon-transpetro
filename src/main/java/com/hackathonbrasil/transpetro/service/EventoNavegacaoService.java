@@ -6,7 +6,11 @@ import com.hackathonbrasil.transpetro.model.EventoNavegacaoResponseDto;
 import com.hackathonbrasil.transpetro.model.Navio;
 import com.hackathonbrasil.transpetro.repository.EventoNavegacaoRepository;
 import com.hackathonbrasil.transpetro.repository.NavioRepository;
+import com.hackathonbrasil.transpetro.model.PageResponseDto;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -127,22 +131,77 @@ public class EventoNavegacaoService {
         return toResponseDto(evento);
     }
 
+    public PageResponseDto<EventoNavegacaoResponseDto> listarTodos(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<EventoNavegacao> pageResult = eventoRepository.findAll(pageable);
+        
+        List<EventoNavegacaoResponseDto> content = pageResult.getContent().stream()
+            .map(this::toResponseDto)
+            .collect(Collectors.toList());
+        
+        return new PageResponseDto<>(
+            content,
+            pageResult.getNumber(),
+            pageResult.getSize(),
+            pageResult.getTotalElements(),
+            pageResult.getTotalPages(),
+            pageResult.isFirst(),
+            pageResult.isLast()
+        );
+    }
+
+    public PageResponseDto<EventoNavegacaoResponseDto> listarPorNavio(Long navioId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<EventoNavegacao> pageResult = eventoRepository.findByNavioIdOrderByStartGMTDateDesc(navioId, pageable);
+        
+        List<EventoNavegacaoResponseDto> content = pageResult.getContent().stream()
+            .map(this::toResponseDto)
+            .collect(Collectors.toList());
+        
+        return new PageResponseDto<>(
+            content,
+            pageResult.getNumber(),
+            pageResult.getSize(),
+            pageResult.getTotalElements(),
+            pageResult.getTotalPages(),
+            pageResult.isFirst(),
+            pageResult.isLast()
+        );
+    }
+
+    public PageResponseDto<EventoNavegacaoResponseDto> listarPorPeriodo(Long navioId, LocalDateTime start, LocalDateTime end, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<EventoNavegacao> pageResult = eventoRepository.findByNavioIdAndPeriod(navioId, start, end, pageable);
+        
+        List<EventoNavegacaoResponseDto> content = pageResult.getContent().stream()
+            .map(this::toResponseDto)
+            .collect(Collectors.toList());
+        
+        return new PageResponseDto<>(
+            content,
+            pageResult.getNumber(),
+            pageResult.getSize(),
+            pageResult.getTotalElements(),
+            pageResult.getTotalPages(),
+            pageResult.isFirst(),
+            pageResult.isLast()
+        );
+    }
+    
+    // Métodos antigos mantidos para compatibilidade (deprecated)
+    @Deprecated
     public List<EventoNavegacaoResponseDto> listarTodos() {
-        return eventoRepository.findAll().stream()
-            .map(this::toResponseDto)
-            .collect(Collectors.toList());
+        return listarTodos(0, 100).getContent();
     }
 
+    @Deprecated
     public List<EventoNavegacaoResponseDto> listarPorNavio(Long navioId) {
-        return eventoRepository.findByNavioIdOrderByStartGMTDateDesc(navioId).stream()
-            .map(this::toResponseDto)
-            .collect(Collectors.toList());
+        return listarPorNavio(navioId, 0, 100).getContent();
     }
 
+    @Deprecated
     public List<EventoNavegacaoResponseDto> listarPorPeriodo(Long navioId, LocalDateTime start, LocalDateTime end) {
-        return eventoRepository.findByNavioIdAndPeriod(navioId, start, end).stream()
-            .map(this::toResponseDto)
-            .collect(Collectors.toList());
+        return listarPorPeriodo(navioId, start, end, 0, 100).getContent();
     }
 
     @Transactional

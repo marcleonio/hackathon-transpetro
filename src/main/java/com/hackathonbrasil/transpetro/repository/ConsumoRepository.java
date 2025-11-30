@@ -1,6 +1,8 @@
 package com.hackathonbrasil.transpetro.repository;
 
 import com.hackathonbrasil.transpetro.model.Consumo;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +14,8 @@ import java.util.List;
 public interface ConsumoRepository extends JpaRepository<Consumo, Long> {
 
     List<Consumo> findByNavioIdOrderByCreatedAtDesc(Long navioId);
+    
+    Page<Consumo> findByNavioIdOrderByCreatedAtDesc(Long navioId, Pageable pageable);
 
     List<Consumo> findBySessionId(String sessionId);
 
