@@ -23,6 +23,11 @@ import java.util.stream.Collectors;
 
 @Service
 public class ModelService {
+
+    // Constante que define o número total de coeficientes gerados pela regressão.
+    // Atualmente: 6 coeficientes (Intercepto + 5 Features)
+    public static final int NUM_MODEL_COEFFICIENTS = 6; 
+
     // Mapeia NavioID -> Data da Última Docagem
     Map<String, LocalDate> lastDockingMap = new HashMap<>();
     //Mapeia NavioID -> CFI_Limpo (Consumo Ideal Específico)
@@ -285,7 +290,21 @@ public class ModelService {
                         double fwdDraft = Double.parseDouble(record.get("fwdDraft").trim());
                         double displacement = Double.parseDouble(record.get("displacement").trim());
                         double duration = Double.parseDouble(record.get("duration").trim());
-                        int beaufortScale = Integer.parseInt(record.get("beaufortScale").trim());
+                        String beaufortScaleStr = record.get("beaufortScale").trim();
+                        String beaufortDesc = record.get("beaufortScaleDesc").trim();
+
+                        int beaufortScale = 0;
+                        try {
+                            // Tenta ler o valor
+                            beaufortScale = Integer.parseInt(beaufortScaleStr);
+                        } catch (NumberFormatException ignored) {
+                            if (!beaufortDesc.isEmpty() && beaufortDesc.matches("^\\d+[\\s-].*")) {
+                                try {
+                                    beaufortScale = Integer.parseInt(beaufortDesc.substring(0, 1));
+                                } catch (Exception e2) {
+                                }
+                            }
+                        }
 
                         ConsolidatedRecord rec = new ConsolidatedRecord(
                             sessionId, normalizeShipId(record.get("shipName")), record.get("class"), record.get("eventName"), record.get("startGMTDate"),
@@ -350,10 +369,10 @@ public class ModelService {
             // Features de Controle (X2, X3)
             tdr.setTrimAjustado(rec.getAftDraft() - rec.getFwdDraft()); // TRIM
             tdr.setDeslocamento(rec.getDisplacement());
-            // tdr.setBeaufortScaleNumeric(rec.getBeaufortScale()); // X4, se quiser adicionar
+            tdr.setBeaufortScaleNumeric(rec.getBeaufortScale()); // X4, se quiser adicionar
 
             // Adicionar features Dummy para classes de navio se necessário
-            // tdr.setClasseAframaxDummy(rec.getClassType().equals("Aframax") ? 1 : 0);
+            tdr.setClasseAframaxDummy(rec.getClassType().equals("Aframax") ? 1 : 0);
 
             trainingData.add(tdr);
         }
@@ -378,8 +397,8 @@ public class ModelService {
      * ETAPA 3: Prepara os arrays e treina o modelo.
      */
     private void trainModel(List<TrainingDataRecord> trainingData) {
-        // Seus 3 preditores são: Dias Desde Limpeza, TRIM Ajustado e Deslocamento
-        final int NUM_FEATURES = 3;
+        // Seus 4 preditores são: Dias Desde Limpeza, TRIM Ajustado, Deslocamento e BeaufortScale
+        final int NUM_FEATURES = NUM_MODEL_COEFFICIENTS - 1;
 
         if (trainingData.size() < NUM_FEATURES + 2) {
             System.err.println("   - Dados insuficientes para treinamento. Mínimo: " + (NUM_FEATURES + 2) + " registros.");
@@ -395,9 +414,12 @@ public class ModelService {
 
         for (int i = 0; i < trainingData.size(); i++) {
             TrainingDataRecord tdr = trainingData.get(i);
-            x[i][0] = tdr.getDiasDesdeLimpeza();
-            x[i][1] = tdr.getTrimAjustado();
-            x[i][2] = tdr.getDeslocamento();
+
+            x[i][0] = tdr.getDiasDesdeLimpeza();       // X1: Dias Desde Limpeza
+            x[i][1] = tdr.getTrimAjustado();           // X2: TRIM
+            x[i][2] = tdr.getDeslocamento();           // X3: Deslocamento
+            x[i][3] = tdr.getBeaufortScaleNumeric();   // X4: Escala Beaufort
+            x[i][4] = (double) tdr.getClasseAframaxDummy(); // X5: Aframax Dummy 
         }
 
         try {
@@ -411,6 +433,8 @@ public class ModelService {
             System.out.println("     Dias Limpeza: " + String.format("%.6f", coefficients[1]));
             System.out.println("     TRIM: " + String.format("%.4f", coefficients[2]));
             System.out.println("     Deslocamento: " + String.format("%.6f", coefficients[3]));
+            System.out.println("     Beaufort Scale: " + String.format("%.4f", coefficients[4]));
+            System.out.println("     Aframax Dummy: " + String.format("%.4f", coefficients[5])); 
 
         } catch (Exception e) {
             System.err.println("   - Erro fatal durante o cálculo da Regressão: " + e.getMessage());
