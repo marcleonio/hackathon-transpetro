@@ -8,13 +8,13 @@ WORKDIR /app/frontend
 
 # Copia os arquivos de dependência do React
 # A pasta do frontend é hackathon-transpetro-frontend
-COPY hackathon-transpetro-frontend/package*.json ./
+COPY frontend/package*.json ./
 
 # Instala as dependências do React
 RUN npm install
 
 # Copia o código fonte do React
-COPY hackathon-transpetro-frontend/ ./
+COPY frontend/ ./
 
 # Constrói a aplicação React (gera arquivos estáticos na pasta 'build')
 RUN npm run build
@@ -23,7 +23,7 @@ RUN npm run build
 # STAGE 2: CONSTRUÇÃO DO BACKEND (SPRING BOOT com Maven)
 # ===============================================
 # Usando a imagem Maven com JDK 17 para o processo de build
-FROM maven:3.9-jdk-17 AS backend-builder
+FROM maven:3.8.5-openjdk-17 AS backend-builder
 
 # Define o diretório de trabalho no contêiner
 WORKDIR /app
@@ -32,7 +32,7 @@ WORKDIR /app
 COPY pom.xml ./
 
 # Copia o código fonte do backend
-COPY hackathon-transpetro-backend/ ./hackathon-transpetro-backend/
+COPY ./ ./hackathon-transpetro-backend/
 
 # --- Integração Frontend no Backend ---
 # Cria a pasta estática dentro do projeto Spring Boot
@@ -53,7 +53,7 @@ ARG JAR_FILE=hackathon-transpetro-backend/target/transpetro-0.0.1-SNAPSHOT.jar
 # STAGE 3: IMAGEM FINAL DE EXECUÇÃO
 # ===============================================
 # Usando a imagem JRE (Java Runtime Environment) mais leve para a execução
-FROM openjdk:17-jre-slim
+FROM openjdk:17.0.1-jdk-slim
 
 # Define o diretório de trabalho
 WORKDIR /app
