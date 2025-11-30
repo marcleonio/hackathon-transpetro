@@ -8,7 +8,11 @@ import com.hackathonbrasil.transpetro.model.Navio;
 import com.hackathonbrasil.transpetro.repository.ConsumoRepository;
 import com.hackathonbrasil.transpetro.repository.EventoNavegacaoRepository;
 import com.hackathonbrasil.transpetro.repository.NavioRepository;
+import com.hackathonbrasil.transpetro.model.PageResponseDto;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -94,16 +98,53 @@ public class ConsumoService {
         return toResponseDto(consumo);
     }
 
-    public List<ConsumoResponseDto> listarTodos() {
-        return consumoRepository.findAll().stream()
+    public PageResponseDto<ConsumoResponseDto> listarTodos(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Consumo> pageResult = consumoRepository.findAll(pageable);
+        
+        List<ConsumoResponseDto> content = pageResult.getContent().stream()
             .map(this::toResponseDto)
             .collect(Collectors.toList());
+        
+        return new PageResponseDto<>(
+            content,
+            pageResult.getNumber(),
+            pageResult.getSize(),
+            pageResult.getTotalElements(),
+            pageResult.getTotalPages(),
+            pageResult.isFirst(),
+            pageResult.isLast()
+        );
     }
 
-    public List<ConsumoResponseDto> listarPorNavio(Long navioId) {
-        return consumoRepository.findByNavioIdOrderByCreatedAtDesc(navioId).stream()
+    public PageResponseDto<ConsumoResponseDto> listarPorNavio(Long navioId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Consumo> pageResult = consumoRepository.findByNavioIdOrderByCreatedAtDesc(navioId, pageable);
+        
+        List<ConsumoResponseDto> content = pageResult.getContent().stream()
             .map(this::toResponseDto)
             .collect(Collectors.toList());
+        
+        return new PageResponseDto<>(
+            content,
+            pageResult.getNumber(),
+            pageResult.getSize(),
+            pageResult.getTotalElements(),
+            pageResult.getTotalPages(),
+            pageResult.isFirst(),
+            pageResult.isLast()
+        );
+    }
+    
+    // Métodos antigos mantidos para compatibilidade (deprecated)
+    @Deprecated
+    public List<ConsumoResponseDto> listarTodos() {
+        return listarTodos(0, 100).getContent();
+    }
+
+    @Deprecated
+    public List<ConsumoResponseDto> listarPorNavio(Long navioId) {
+        return listarPorNavio(navioId, 0, 100).getContent();
     }
 
     @Transactional
