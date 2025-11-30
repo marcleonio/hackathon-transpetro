@@ -74,6 +74,7 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ ships }) => {
                 </p>
                 <p className="text-xs text-gray-600">
                   HPI: {currentHPI.toFixed(3)} • {formatDate(ship.dataIdealLimpeza)}
+                  {ship.diasParaIntervencao > 0 && ` • ${ship.diasParaIntervencao} dias`}
                 </p>
               </div>
             </div>

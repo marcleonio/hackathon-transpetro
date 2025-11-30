@@ -8,7 +8,9 @@ export const exportToCSV = (ships: Record<string, CleaningSuggestion>, filename 
     'Status Casco',
     'Nível Bioincrustação',
     'HPI Atual',
+    'Última Limpeza',
     'Data Ideal Limpeza',
+    'Dias para Intervenção',
     'CFI Limpo (Ton/dia)',
     'Consumo Extra Máx (Ton/dia)',
   ];
@@ -20,7 +22,9 @@ export const exportToCSV = (ships: Record<string, CleaningSuggestion>, filename 
       ship.statusCascoAtual,
       ship.nivelBioincrustacao,
       currentHPI.toFixed(3),
+      ship.dataUltimaLimpeza ? formatFullDate(ship.dataUltimaLimpeza) : 'N/A',
       ship.dataIdealLimpeza ? formatFullDate(ship.dataIdealLimpeza) : 'N/A',
+      ship.diasParaIntervencao.toString(),
       ship.cfiCleanTonPerDay.toFixed(2),
       ship.maxExtraFuelTonPerDay.toFixed(2),
     ];

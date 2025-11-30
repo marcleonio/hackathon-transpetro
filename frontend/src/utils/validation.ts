@@ -12,7 +12,12 @@ export const isValidCleaningSuggestion = (
     typeof suggestion.nivelBioincrustacao === 'number' &&
     typeof suggestion.cfiCleanTonPerDay === 'number' &&
     typeof suggestion.maxExtraFuelTonPerDay === 'number' &&
-    Array.isArray(suggestion.predictions)
+    typeof suggestion.diasParaIntervencao === 'number' &&
+    Array.isArray(suggestion.predictions) &&
+    (suggestion.dataUltimaLimpeza === null ||
+      typeof suggestion.dataUltimaLimpeza === 'string') &&
+    (suggestion.dataIdealLimpeza === null ||
+      typeof suggestion.dataIdealLimpeza === 'string')
   );
 };
 
@@ -30,7 +35,10 @@ export const isValidDailyPrediction = (
     typeof pred.extraFuelTonPerDay === 'number' &&
     !isNaN(pred.hpi) &&
     !isNaN(pred.dragPercent) &&
-    !isNaN(pred.extraFuelTonPerDay)
+    !isNaN(pred.extraFuelTonPerDay) &&
+    (pred.estimatedIncrustationCoverage === undefined ||
+      (typeof pred.estimatedIncrustationCoverage === 'number' &&
+        !isNaN(pred.estimatedIncrustationCoverage)))
   );
 };
 
@@ -45,6 +53,9 @@ export const sanitizeCleaningSuggestion = (
 
   return {
     ...data,
+    dataUltimaLimpeza: data.dataUltimaLimpeza ?? null,
+    dataIdealLimpeza: data.dataIdealLimpeza ?? null,
+    diasParaIntervencao: data.diasParaIntervencao ?? 0,
     predictions: validPredictions,
   };
 };

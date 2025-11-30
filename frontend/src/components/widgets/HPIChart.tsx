@@ -30,6 +30,7 @@ interface ChartDataPoint {
   date: string;
   hpi: number;
   fullDate: string;
+  estimatedIncrustationCoverage?: number;
 }
 
 interface CustomTooltipProps extends TooltipProps<number, string> {
@@ -58,12 +59,20 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload }) => {
       <p className="text-xs font-bold text-gray-900 mb-1.5">
         {formatFullDate(data.fullDate)}
       </p>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 mb-1">
         <span className="text-xs font-semibold text-gray-600">HPI:</span>
         <span className={cn('text-sm font-bold', isCritical ? 'text-red-600' : 'text-gray-900')}>
           {hpiValue.toFixed(3)}
         </span>
       </div>
+      {data.estimatedIncrustationCoverage !== undefined && (
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-semibold text-gray-600">Cobertura:</span>
+          <span className="text-xs font-bold text-gray-900">
+            {data.estimatedIncrustationCoverage.toFixed(2)}%
+          </span>
+        </div>
+      )}
       {isCritical && (
         <p className="text-xs text-red-600 mt-1.5 font-semibold">Acima do limite crítico</p>
       )}
@@ -82,6 +91,7 @@ export const HPIChart: React.FC<HPIChartProps> = ({
         date: formatShortDate(pred.data),
         hpi: Number(pred.hpi.toFixed(3)),
         fullDate: pred.data,
+        estimatedIncrustationCoverage: pred.estimatedIncrustationCoverage,
       })),
     [predictions]
   );

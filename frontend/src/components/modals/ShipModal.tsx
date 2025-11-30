@@ -108,11 +108,15 @@ export const ShipModal: React.FC<ShipModalProps> = ({
                 <p className="text-lg sm:text-xl font-bold text-gray-900">
                   {formatFullDate(data.dataIdealLimpeza)}
                 </p>
-                {daysUntilCleaning !== null && (
+                {data.diasParaIntervencao > 0 ? (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {data.diasParaIntervencao} dias para intervenção
+                  </p>
+                ) : daysUntilCleaning !== null ? (
                   <p className="text-xs text-gray-500 mt-1">
                     {getDaysUntilDescription(daysUntilCleaning)}
                   </p>
-                )}
+                ) : null}
               </CardContent>
             </Card>
 
@@ -144,6 +148,24 @@ export const ShipModal: React.FC<ShipModalProps> = ({
               </CardContent>
             </Card>
           </div>
+
+          {data.dataUltimaLimpeza && (
+            <Card className="bg-green-50/50 border-green-200 animate-fade-in-up stagger-4">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-petrobras-green flex-shrink-0" />
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">
+                      Última Limpeza
+                    </h3>
+                    <p className="text-xs sm:text-sm text-gray-700">
+                      {formatFullDate(data.dataUltimaLimpeza)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="bg-blue-50/50 border-blue-200 animate-fade-in-up stagger-4">
             <CardContent className="p-3 sm:p-4">

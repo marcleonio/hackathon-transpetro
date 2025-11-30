@@ -118,14 +118,16 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
         navioId: ship.navioId,
         nivelBioincrustacao: ship.nivelBioincrustacao,
         hpiAtual: currentHPI.toFixed(3),
+        dataUltimaLimpeza: ship.dataUltimaLimpeza ? formatDate(ship.dataUltimaLimpeza) : 'N/A',
         dataLimpeza: ship.dataIdealLimpeza ? formatDate(ship.dataIdealLimpeza) : 'N/A',
+        diasParaIntervencao: ship.diasParaIntervencao,
         cfiLimpo: ship.cfiCleanTonPerDay.toFixed(2),
         consumoExtra: ship.maxExtraFuelTonPerDay.toFixed(2),
       };
     });
 
     const csvContent = [
-      ['Navio ID', 'Nível', 'HPI Atual', 'Data Limpeza', 'CFI Limpo', 'Consumo Extra'].join(','),
+      ['Navio ID', 'Nível', 'HPI Atual', 'Última Limpeza', 'Data Limpeza Sugerida', 'Dias para Intervenção', 'CFI Limpo', 'Consumo Extra'].join(','),
       ...exportData.map((row) => Object.values(row).map((cell) => `"${cell}"`).join(',')),
     ].join('\n');
 

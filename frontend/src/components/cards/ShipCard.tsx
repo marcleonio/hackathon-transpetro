@@ -129,6 +129,11 @@ export const ShipCard: React.FC<ShipCardProps> = ({
               <p className="text-sm font-bold text-gray-900 truncate">
                 {formatDate(data.dataIdealLimpeza)}
               </p>
+              {data.diasParaIntervencao > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {data.diasParaIntervencao} dias
+                </p>
+              )}
             </div>
 
             <div className="p-3 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
@@ -140,6 +145,18 @@ export const ShipCard: React.FC<ShipCardProps> = ({
                 {data.cfiCleanTonPerDay.toFixed(1)} T/d
               </p>
             </div>
+
+            {data.dataUltimaLimpeza && (
+              <div className="col-span-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="h-4 w-4 text-blue-600" />
+                  <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">Última Limpeza</span>
+                </div>
+                <p className="text-sm font-bold text-blue-900">
+                  {formatDate(data.dataUltimaLimpeza)}
+                </p>
+              </div>
+            )}
 
             <div className="col-span-2 p-3 bg-red-50 rounded-lg border border-red-200">
               <div className="flex items-center gap-2 mb-2">
