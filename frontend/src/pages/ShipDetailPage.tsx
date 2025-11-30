@@ -245,9 +245,11 @@ export const ShipDetailPage: React.FC<ShipDetailPageProps> = ({
                         <span className="text-xs font-semibold text-gray-600 uppercase">Limpeza Recomendada</span>
                       </div>
                       <p className="text-lg font-bold text-gray-900">{formatFullDate(ship.dataIdealLimpeza)}</p>
-                      {daysUntil !== null && (
+                      {ship.diasParaIntervencao > 0 ? (
+                        <p className="text-xs text-gray-500 mt-1">{ship.diasParaIntervencao} dias para intervenção</p>
+                      ) : daysUntil !== null ? (
                         <p className="text-xs text-gray-500 mt-1">{daysUntil} dias restantes</p>
-                      )}
+                      ) : null}
                     </div>
 
                     <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -258,6 +260,16 @@ export const ShipDetailPage: React.FC<ShipDetailPageProps> = ({
                       <p className="text-lg font-bold text-gray-900">{ship.cfiCleanTonPerDay.toFixed(1)} Ton/dia</p>
                     </div>
                   </div>
+
+                  {ship.dataUltimaLimpeza && (
+                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Calendar className="h-4 w-4 text-green-600" />
+                        <span className="text-xs font-semibold text-green-700 uppercase">Última Limpeza</span>
+                      </div>
+                      <p className="text-lg font-bold text-green-900">{formatFullDate(ship.dataUltimaLimpeza)}</p>
+                    </div>
+                  )}
 
                   <div className="p-4 bg-red-50 rounded-lg border border-red-200">
                     <div className="flex items-center gap-2 mb-2">

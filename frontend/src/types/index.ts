@@ -3,11 +3,14 @@ export interface DailyPrediction {
   hpi: number;
   dragPercent: number;
   extraFuelTonPerDay: number;
+  estimatedIncrustationCoverage?: number;
 }
 
 export interface CleaningSuggestion {
   navioId: string;
+  dataUltimaLimpeza: string | null;
   dataIdealLimpeza: string | null;
+  diasParaIntervencao: number;
   justificativa: string;
   statusCascoAtual: string;
   nivelBioincrustacao: number;

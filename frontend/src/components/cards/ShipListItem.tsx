@@ -82,6 +82,11 @@ export const ShipListItem: React.FC<ShipListItemProps> = ({ data, onClick }) => 
           <p className="text-xs font-bold text-gray-900 truncate">
             {formatDate(data.dataIdealLimpeza)}
           </p>
+          {data.diasParaIntervencao > 0 && (
+            <p className="text-xs text-gray-500 truncate">
+              {data.diasParaIntervencao} dias
+            </p>
+          )}
         </div>
 
         <div className="col-span-6 sm:col-span-2 min-w-0">
