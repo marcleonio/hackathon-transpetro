@@ -3,235 +3,295 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Performance da Frota</title>
+    <title>Transpetro - Previsão de Limpeza e Performance</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; background-color: #f4f4f9; padding: 20px; }
-        header { text-align: center; padding: 20px 10px; background-color: #007bff; color: white; margin-bottom: 20px; border-radius: 8px; }
-        .container { max-width: 1400px; margin: auto; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f9; }
+        .header { text-align: center; margin-bottom: 30px; color: #003366; }
+        .nav-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 40px; }
+        .nav-button {
+            padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer;
+            background-color: #005f99; color: white; font-weight: bold;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .nav-button:hover { background-color: #007bb6; transform: translateY(-1px); }
+        .dashboard {
+            background-color: white; padding: 30px; border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .summary-box {
+            display: flex; justify-content: space-around; flex-wrap: wrap;
+            margin-bottom: 30px; text-align: center;
+        }
+        .summary-item {
+            padding: 15px; border-radius: 8px; width: 250px; margin: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        .status-0 { background-color: #e6ffe6; color: #008000; border-left: 5px solid #008000; }
+        .status-1 { background-color: #ffffe0; color: #999900; border-left: 5px solid #999900; }
+        .status-2 { background-color: #ffe8cc; color: #ff8c00; border-left: 5px solid #ff8c00; }
+        .status-3 { background-color: #ffcccc; color: #cc0000; border-left: 5px solid #cc0000; }
+        .status-4 { background-color: #f8e1e1; color: #8b0000; border-left: 5px solid #8b0000; }
 
-        /* Estilos dos Níveis de Risco */
-        .risk-levels { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 30px; }
-        .risk-card {
-            padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            width: 280px; text-align: center; font-size: 0.9em;
-        }
-        .risk-card h4 { margin-top: 0; margin-bottom: 5px; font-size: 1.1em; }
-        .risk-card.level-1 { background-color: #d4edda; border-left: 5px solid #28a745; }
-        .risk-card.level-2 { background-color: #fff3cd; border-left: 5px solid #ffc107; }
-        .risk-card.level-3 { background-color: #f8d7da; border-left: 5px solid #dc3545; }
-        .risk-card.level-4 { background-color: #e2e3e5; border-left: 5px solid #6c757d; color: #343a40; }
-
-        /* Estilos dos Cards dos Navios */
-        #ship-dashboard {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-            gap: 20px;
-        }
-        .ship-card {
-            background-color: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
-            display: flex;
-            flex-direction: column;
-            transition: transform 0.2s;
-        }
-        .ship-card:hover { transform: translateY(-5px); }
-        .ship-card h3 { margin-top: 0; margin-bottom: 5px; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
-        .ship-details { margin-bottom: 15px; font-size: 0.9em; }
-        .status-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 5px;
-            font-weight: bold;
-            font-size: 0.85em;
-            margin-top: 5px;
-        }
-        .status-1 { background-color: #28a745; color: white; }
-        .status-2 { background-color: #ffc107; color: #343a40; }
-        .status-3 { background-color: #dc3545; color: white; }
-        .status-4 { background-color: #6c757d; color: white; }
-        .chart-container-small { height: 200px; }
+        .chart-container { margin-top: 20px; width: 100%; max-width: 1000px; margin: 20px auto; }
+        h3 { border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 40px; color: #333; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h2>🌊 Dashboard de Performance da Frota e Sugestão de Limpeza</h2>
-            <p>Visualização em tempo real do HPI (Hull Performance Index) e Consumo Extra Projetado.</p>
-        </header>
 
-        <h3>Níveis de Bioincrustação (Escala de Risco)</h3>
-        <div class="risk-levels">
-            <div class="risk-card level-1">
-                <h4>Nível 1: Limpo / Bom</h4>
-                <p>HPI $\approx 1.0$. Eficiência máxima. Monitoramento de rotina.</p>
-            </div>
-            <div class="risk-card level-2">
-                <h4>Nível 2: Moderado</h4>
-                <p>HPI $1.0 - 1.04$. Microincrustação leve. Iniciar planejamento de limpeza.</p>
-            </div>
-            <div class="risk-card level-3">
-                <h4>Nível 3: Alto / Crítico</h4>
-                <p>HPI $1.04 - 1.08$. Macroincrustação aparente. Agendar limpeza urgente.</p>
-            </div>
-            <div class="risk-card level-4">
-                <h4>Nível 4: URGENTE / Extremo</h4>
-                <p>HPI $> 1.08$. Macroincrustação pesada. Perda de eficiência inaceitável.</p>
-            </div>
+<div class="header">
+    <h1>Dashboard de Previsão de Casco (HPI)</h1>
+    <p id="current-navio-name">Selecione um navio para iniciar a análise</p>
+</div>
+
+<div class="nav-list" id="ship-buttons">
+    </div>
+
+<div class="dashboard hidden" id="prediction-dashboard">
+
+    <div class="summary-box">
+        <div class="summary-item" id="summary-status">
+            <strong>Status Atual do Casco:</strong><br><span id="status-descricao"></span>
         </div>
-        <hr/>
-
-        <h3>Detalhes da Frota</h3>
-        <div id="ship-dashboard">
-            <p>Carregando dados da frota...</p>
+        <div class="summary-item status-0">
+            <strong>Última Docagem:</strong><br><span id="ultima-limpeza"></span>
+        </div>
+        <div class="summary-item status-0">
+            <strong>Data Sugerida de Limpeza:</strong><br><span id="data-ideal"></span>
+        </div>
+        <div class="summary-item status-0">
+            <strong>Dias Pós-Limpeza:</strong><br><span id="dias-restantes"></span>
+        </div>
+        <div class="summary-item status-0">
+            <strong>Combustível Extra Máximo:</strong><br><span id="max-fuel"></span> Ton/Dia
         </div>
     </div>
 
-    <script>
-        const NAVIOS_ID = [
-            "Bruno Lima", "Carla Silva", "Daniel Pereira", "Eduardo Costa",
-            "Fábio Santos", "Felipe Ribeiro", "Gabriela Martins", "Giselle Carvalho",
-            "Henrique Alves", "Lucas Mendonça", "Marcos Cavalcanti", "Maria Valentina",
-            "Paulo Moura", "Rafael Santos", "Raul Martins", "Renato Gomes",
-            "Ricardo Barbosa", "Rodrigo Pinheiro", "Romario Silva", "Thiago Fernandes",
-            "Victor Oliveira"
-        ];
+    <p style="text-align: center; font-style: italic;" id="justificativa-text"></p>
 
-        const API_BASE_URL = "http://localhost:8080/api/v1/previsao/limpeza-sugerida?navioId=";
-        const dashboard = document.getElementById('ship-dashboard');
+    <h3>HPI - Índice de Performance do Casco</h3>
+    <div class="chart-container">
+        <canvas id="hpiChart"></canvas>
+    </div>
 
-        // Função para obter o status visual (classe CSS)
-        function getStatusClass(nivel) {
-            if (nivel >= 4) return 'status-4';
-            if (nivel === 3) return 'status-3';
-            if (nivel === 2) return 'status-2';
-            return 'status-1';
+    <h3>Arrasto Relativo (%)</h3>
+    <div class="chart-container">
+        <canvas id="dragChart"></canvas>
+    </div>
+
+    <h3>Consumo Extra Diário (Ton/Dia) - Potencial de Economia</h3>
+    <div class="chart-container">
+        <canvas id="fuelChart"></canvas>
+    </div>
+
+</div>
+
+<script>
+    const NAVIOS = [
+        "RAFAEL SANTOS", "HENRIQUE ALVES", "VICTOR OLIVEIRA", "FELIPE RIBEIRO",
+        "GISELLE CARVALHO", "RAUL MARTINS", "PAULO MOURA", "MARCOS CAVALCANTI",
+        "DANIEL PEREIRA", "CARLA SILVA", "RENATO GOMES", "GABRIELA MARTINS",
+        "RODRIGO PINHEIRO", "EDUARDO COSTA", "THIAGO FERNANDES", "ROMARIO SILVA",
+        "LUCAS MENDONÇA", "RICARDO BARBOSA", "BRUNO LIMA", "FÁBIO SANTOS", "MARIA VALENTINA"
+    ];
+
+    const API_URL = 'http://localhost:8080/api/v1/previsao/limpeza-sugerida?navioId=';
+
+    let hpiChart, dragChart, fuelChart;
+
+    // --- 1. FUNÇÕES DE INICIALIZAÇÃO ---
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Gera botões de navio
+        const buttonContainer = document.getElementById('ship-buttons');
+        NAVIOS.forEach(navio => {
+            const button = document.createElement('button');
+            button.className = 'nav-button';
+            button.textContent = navio;
+            button.onclick = () => fetchPrediction(navio);
+            buttonContainer.appendChild(button);
+        });
+    });
+
+    // --- 2. BUSCA DE DADOS NA API ---
+
+    async function fetchPrediction(navioId) {
+        document.getElementById('current-navio-name').textContent = `Carregando dados para: ${navioId}...`;
+
+        try {
+            const response = await fetch(API_URL + encodeURIComponent(navioId));
+            if (!response.ok) {
+                throw new Error(`Erro na API: ${response.statusText}`);
+            }
+            const data = await response.json();
+
+            // Renderiza o dashboard com os dados recebidos
+            renderDashboard(data);
+
+        } catch (error) {
+            console.error('Erro ao buscar a previsão:', error);
+            alert('Erro ao carregar dados. Verifique se sua API está rodando em http://localhost:8080.');
+            document.getElementById('current-navio-name').textContent = `Falha ao carregar dados para: ${navioId}`;
+        }
+    }
+
+    // --- 3. PROCESSAMENTO E RENDERIZAÇÃO ---
+
+    function renderDashboard(data) {
+        document.getElementById('prediction-dashboard').classList.remove('hidden');
+        document.getElementById('current-navio-name').textContent = `Análise de Previsão: ${data.navioId}`;
+
+        // 3.1. Preparar Dados para Gráficos
+        const labels = data.predictions.map(p => formatDate(p.data));
+        const hpiData = data.predictions.map(p => p.hpi);
+        const dragData = data.predictions.map(p => p.dragPercent);
+        const fuelData = data.predictions.map(p => p.extraFuelTonPerDay);
+
+        const suggestedDateIndex = data.predictions.findIndex(p => p.data === data.dataLimpezaIdeal);
+        const suggestedDateLabel = suggestedDateIndex !== -1 ? labels[suggestedDateIndex] : null;
+
+        const maxHpi = Math.max(...hpiData);
+
+        // 3.2. Renderizar Sumário
+        updateSummary(data);
+
+        // 3.3. Renderizar Gráficos
+
+        // Destrói gráficos antigos para evitar sobreposição
+        if (hpiChart) hpiChart.destroy();
+        if (dragChart) dragChart.destroy();
+        if (fuelChart) fuelChart.destroy();
+
+        // Obtém o limite dinâmico (necessário para o gráfico de HPI)
+        let dynamicHpiLimit = 0;
+        if (suggestedDateIndex !== -1 && data.dataLimpezaIdeal) {
+             // Se houver data sugerida, o HPI nesse dia é o limite que disparou o gatilho
+             dynamicHpiLimit = hpiData[suggestedDateIndex];
+        } else if (maxHpi > 1.0) {
+            // Se não houver data, podemos estimar o limite pelo HPI final da projeção
+            dynamicHpiLimit = hpiData[hpiData.length - 1];
         }
 
-        // Função para formatar a data
-        function formatDate(dateString) {
-            if (!dateString) return 'N/A';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('pt-BR');
-        }
+        hpiChart = createHPIChart('hpiChart', labels, hpiData, dynamicHpiLimit);
+        dragChart = createLineChart('dragChart', labels, dragData, 'Arrasto (%)', 'rgba(255, 99, 132, 1)');
+        fuelChart = createLineChart('fuelChart', labels, fuelData, 'Consumo Extra (Ton/Dia)', 'rgba(54, 162, 235, 1)');
+    }
 
-        // Função para desenhar o gráfico HPI para um navio específico
-        function drawHPIChart(canvasId, predictions) {
-            const dates = predictions.map(p => new Date(p.data).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' }));
-            const hpiValues = predictions.map(p => p.hpi);
-            const nivelBioincrustacao = predictions.length > 0 ? (hpiValues[0] > 1.08 ? 4 : (hpiValues[0] > 1.04 ? 3 : (hpiValues[0] > 1.0 ? 2 : 1))) : 1;
+    // --- 4. FUNÇÕES AUXILIARES ---
 
-            let lineColor = 'rgba(75, 192, 192, 1)'; // Nível 1/2
-            if (nivelBioincrustacao >= 3) lineColor = 'rgba(255, 99, 132, 1)'; // Nível 3/4 (Crítico/Urgente)
+    function updateSummary(data) {
+        document.getElementById('ultima-limpeza').textContent = formatDate(data.dataUltimaLimpeza);
+        document.getElementById('data-ideal').textContent = data.dataLimpezaIdeal ? formatDate(data.dataLimpezaIdeal) : 'Não necessário em 180 dias';
+        document.getElementById('dias-restantes').textContent = data.diasParaIntervencao > 0 ? data.diasParaIntervencao + ' dias' : 'N/A';
+        document.getElementById('max-fuel').textContent = data.maxExtraFuelTonPerDay.toFixed(2);
+        document.getElementById('justificativa-text').textContent = data.justificativa;
 
-            const ctx = document.getElementById(canvasId).getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: dates.slice(0, 30), // Limita a 30 dias para o gráfico do card
-                    datasets: [{
+        // Atualiza Status e Estilo
+        const statusElement = document.getElementById('summary-status');
+        const statusDesc = document.getElementById('status-descricao');
+
+        // Remove classes de status antigas
+        statusElement.className = 'summary-item';
+        // Adiciona a nova classe de status
+        statusElement.classList.add(`status-${data.nivelAtual}`);
+        statusDesc.textContent = data.statusDescricao;
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        const [year, month, day] = dateString.split('-');
+        return `${day}/${month}/${year}`;
+    }
+
+    function createLineChart(canvasId, labels, data, label, color) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+
+        return new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: label,
+                    data: data,
+                    borderColor: color,
+                    backgroundColor: 'rgba(0, 0, 0, 0)',
+                    borderWidth: 2,
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Data' },
+                        ticks: {
+                             // Mostra apenas 1 tick a cada 30 (mensal) para não poluir
+                            autoSkip: true,
+                            maxTicksLimit: 6
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: label }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+
+    function createHPIChart(canvasId, labels, hpiData, limit) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+
+        // Linha do Limite Dinâmico
+        const limitLineData = new Array(hpiData.length).fill(limit);
+
+        return new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
                         label: 'HPI Projetado',
-                        data: hpiValues.slice(0, 30),
-                        borderColor: lineColor,
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        pointRadius: 1,
+                        data: hpiData,
+                        borderColor: 'rgba(0, 95, 153, 1)',
+                        backgroundColor: 'rgba(0, 0, 0, 0)',
                         borderWidth: 2,
-                        fill: false,
+                        pointRadius: 0,
                         tension: 0.1
                     },
                     {
-                        // Linha de referência HPI = 1.0
-                        label: 'HPI Ideal',
-                        data: Array(30).fill(1.0),
-                        borderColor: 'rgba(0, 123, 255, 0.7)',
+                        label: `Limite Dinâmico (${limit.toFixed(3)})`,
+                        data: limitLineData,
+                        borderColor: 'rgba(255, 0, 0, 0.7)',
+                        backgroundColor: 'rgba(0, 0, 0, 0)',
+                        borderWidth: 1,
                         borderDash: [5, 5],
-                        pointRadius: 0,
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: {
-                            display: true,
-                            title: { display: true, text: 'HPI' },
-                            min: 1.0
-                        },
-                        x: { display: false } // Oculta as datas no card pequeno
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Data' },
+                        ticks: { autoSkip: true, maxTicksLimit: 6 }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        min: 1.00,
+                        max: Math.max(1.10, Math.ceil(Math.max(...hpiData) * 10) / 10), // Garante que 1.10 seja visível
+                        title: { display: true, text: 'HPI (Hull Performance Index)' }
                     }
                 }
-            });
-        }
-
-        // Função para criar o card e desenhar o gráfico
-        function createShipCard(data) {
-            const navioIdEncoded = data.navioId.replace(/ /g, '_');
-            const statusClass = getStatusClass(data.nivelBioincrustacao);
-
-            // Cria o HTML do card
-            const cardHtml = `
-                <div class="ship-card">
-                    <h3>${data.navioId}</h3>
-                    <div class="ship-details">
-                        <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${data.statusCascoAtual}</span></p>
-                        <p><strong>Nível Risco:</strong> ${data.nivelBioincrustacao}</p>
-                        <p><strong>CFI Limpo (Base):</strong> ${data.cfiCleanTonPerDay ? data.cfiCleanTonPerDay.toFixed(2) : 'N/A'} Ton/Dia</p>
-                        <p><strong>Consumo Extra Máx:</strong> ${data.maxExtraFuelTonPerDay ? data.maxExtraFuelTonPerDay.toFixed(2) : 'N/A'} Ton/Dia</p>
-                        <p><strong>Limpeza Sugerida:</strong> ${formatDate(data.dataIdealLimpeza)}</p>
-                    </div>
-                    <div class="chart-container-small">
-                        <canvas id="chart-${navioIdEncoded}"></canvas>
-                    </div>
-                </div>
-            `;
-
-            // Insere o card no DOM
-            dashboard.insertAdjacentHTML('beforeend', cardHtml);
-
-            // Desenha o gráfico
-            if (data.predictions && data.predictions.length > 0) {
-                drawHPIChart(`chart-${navioIdEncoded}`, data.predictions);
             }
-        }
+        });
+    }
 
-        // Função principal de carregamento
-        async function loadDashboard() {
-            dashboard.innerHTML = ''; // Limpa o "Carregando dados..."
-
-            const promises = NAVIOS_ID.map(navioId => {
-                const navioIdUrl = encodeURIComponent(navioId);
-                return fetch(API_BASE_URL + navioIdUrl)
-                    .then(response => {
-                        if (!response.ok) {
-                            console.error(`Erro ao carregar ${navioId}: ${response.statusText}`);
-                            return { navioId, error: "Dados não encontrados ou erro na API." };
-                        }
-                        return response.json();
-                    })
-                    .catch(e => {
-                         console.error(`Erro de rede para ${navioId}: ${e.message}`);
-                         return { navioId, error: "Erro de rede/CORS." };
-                    });
-            });
-
-            const results = await Promise.all(promises);
-
-            results.forEach(result => {
-                if (result.error) {
-                    // Exibe um card simples de erro
-                    dashboard.insertAdjacentHTML('beforeend', `<div class="ship-card" style="background-color: #f8d7da;"><h3>${result.navioId}</h3><p>Erro: ${result.error}</p></div>`);
-                } else {
-                    createShipCard(result);
-                }
-            });
-        }
-
-        loadDashboard();
-
-    </script>
+</script>
 </body>
 </html>

@@ -1,6 +1,8 @@
 package com.hackathonbrasil.transpetro.service;
 
 import com.hackathonbrasil.transpetro.model.ConsolidatedRecord;
+import com.hackathonbrasil.transpetro.model.RevestimentoDetail;
+import com.hackathonbrasil.transpetro.model.ShipDetail;
 import com.hackathonbrasil.transpetro.model.TrainingDataRecord;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -25,6 +27,11 @@ public class ModelService {
     //Mapeia NavioID -> CFI_Limpo (Consumo Ideal Específico)
     Map<String, Double> cfiCleanMap = new HashMap<>();
 
+    private final Map<String, ShipDetail> shipDetailsMap = new HashMap<>();
+
+
+    private final Map<String, RevestimentoDetail> revestimentosMap = new HashMap<>();
+
     // Constantes de Limites
     private static final int DAYS_POST_CLEANING_START = 3; // Começa a contar a partir do 3º dia
     private static final int DAYS_POST_CLEANING_END = 7;   // Último dia para o cálculo da média
@@ -39,6 +46,8 @@ public class ModelService {
     }
 
     private static final String DOCAGEM_FILE = "dados_docagem.csv"; // Arquivo com as docagens
+    private static final String REVESTIMENTO_FILE = "revestimento.csv";
+    private static final String SHIP_DETAILS_FILE = "dados_navio.csv"; // Arquivo que acabamos de criar
 
     /**
      * Lê o arquivo de docagem e retorna a data de docagem mais recente para cada navio.
@@ -96,13 +105,90 @@ public class ModelService {
         return null;
     }
 
+    public void carregarDadosRevestimento(String filePath) throws IOException {
+
+        try (Reader in = new FileReader(new ClassPathResource(filePath).getFile())) {
+
+            // ... (configuração do CSVFormat: verifique se o header reflete todas as colunas) ...
+            Iterable<CSVRecord> records = CSVFormat.DEFAULT
+                .builder()
+                .setHeader("Sigla", "Nome do navio", "TipoClass", "TipoCarga", "ClasseNum", "Data da aplicacao", "Cr1. Período base de verificação", "Cr1. Parada máxima acumulada no período")
+                .setSkipHeaderRecord(true)
+                .build()
+                .parse(in);
+
+            for (CSVRecord record : records) {
+                String shipName = record.get("Nome do navio").trim().toUpperCase();
+                String dateString = record.get("Data da aplicacao").trim();
+                String periodo = record.get("Cr1. Período base de verificação").trim();
+
+                // Tenta parsear a data de aplicação (formato M/D/YYYY)
+                LocalDate dataAplicacao = parseDockingDate(dateString);
+
+                if (dataAplicacao == null) continue;
+
+                int periodoBase = Integer.parseInt(periodo);
+
+                // CRÍTICO: Atualiza ou insere, mantendo SOMENTE o revestimento com a data de aplicação MAIS RECENTE
+                revestimentosMap.compute(shipName, (k, existingDetail) -> {
+                    if (existingDetail == null || dataAplicacao.isAfter(existingDetail.getDataAplicacao())) {
+                        // Novo registro ou registro mais recente encontrado
+                        return new RevestimentoDetail(shipName, periodoBase, dataAplicacao);
+                    }
+                    return existingDetail; // Mantém o registro existente (mais recente)
+                });
+            }
+        }
+    }
+
+    /**
+     * Carrega os detalhes físicos e de classe do navio para o mapeamento HPI Dinâmico.
+     */
+    public void loadShipDetails(String filePath) throws IOException {
+
+        try (Reader in = new FileReader(new ClassPathResource(filePath).getFile())) {
+
+            // Headers baseados no CSV fornecido:
+            Iterable<CSVRecord> records = CSVFormat.DEFAULT
+                    .builder()
+                    .setHeader("Nome do navio", "Classe", "Tipo", "Porte Bruto", "Comprimento total (m)", "Boca (m)", "Calado (m)", "Pontal (m)")
+                    .setSkipHeaderRecord(true)
+                    .build()
+                    .parse(in);
+
+            for (CSVRecord record : records) {
+
+                String shipName = record.get("Nome do navio").trim().toUpperCase();
+                String shipClass = record.get("Classe").trim();
+                String cargoType = record.get("Tipo").trim();
+
+                if (shipName.isEmpty()) continue;
+
+                try {
+                    // Porte Bruto (Deadweight Tonnage) é a chave para a regra HPI
+                    double dWT = Double.parseDouble(record.get("Porte Bruto").trim());
+
+                    ShipDetail detail = new ShipDetail(shipName, shipClass, cargoType, dWT);
+                    shipDetailsMap.put(shipName, detail);
+
+                } catch (NumberFormatException ignored) {
+                    // Ignora linhas com Porte Bruto inválido
+                }
+            }
+        }
+        System.out.println("   - Detalhes de " + shipDetailsMap.size() + " navios carregados.");
+    }
+
     // --- PIPELINE DE TREINAMENTO (Pode ser chamado pelo @PostConstruct ou @Bean) ---
     public void initDataAndTrainModel() {
         try {
             System.out.println("Iniciando pipeline de processamento e treinamento...");
 
-            // NOVO: Carrega as datas de docagem (100% limpeza)
-            Map<String, LocalDate> lastCleaningMap = loadDockingDates(DOCAGEM_FILE); // Usamos o mapa de docagem
+            loadShipDetails(SHIP_DETAILS_FILE);
+            System.out.println("Detalhes do Navio (Classe/Porte Bruto) Carregados.");
+
+            // Carrega as datas de docagem (100% limpeza)
+            Map<String, LocalDate> lastCleaningMap = loadDockingDates(DOCAGEM_FILE);
             System.out.println("Datas de Docagem (Limpeza 100%) Carregadas: " + lastCleaningMap.size() + " navios.");
 
             // 1. CONSOLIDAÇÃO
@@ -122,6 +208,10 @@ public class ModelService {
             // 2. ENGENHARIA DE FEATURES: Passa o mapa de docagem
             List<TrainingDataRecord> trainingData = featureEngineering(rawData, lastCleaningMap);
             System.out.println("Etapa 2: Engenharia de Features concluída. Dados para treino: " + trainingData.size());
+
+
+            carregarDadosRevestimento(REVESTIMENTO_FILE);
+            System.out.println("Etapa 2.5: dados do revestimento");
 
             // 3. TREINAMENTO
             trainModel(trainingData);
@@ -242,8 +332,12 @@ public class ModelService {
             // Consumo Diário: Assumindo que duration está em HORAS.
             double dailyConsumption = rec.getConsumedQuantity() / (rec.getDuration() / 24.0);
 
+            // Consumo de Referência: Usar o CFI Limpo ESPECÍFICO do navio.
+            double cfiCleanSpec = getCfiCleanTonPerDay(rec.getShipName());
+
             // HPI é a razão entre o consumo real e o consumo de referência para uma condição limpa.
-            double hpiCalculated = dailyConsumption / HPI_BASELINE_CONSUMPTION;
+            // Se o CFI específico não for encontrado, getCfiCleanTonPerDay retorna a média da frota (FALLBACK_CFI)
+            double hpiCalculated = dailyConsumption / cfiCleanSpec;
 
             if (hpiCalculated < 1.0) hpiCalculated = 1.0; // Garante HPI mínimo de 1.0
 
@@ -387,6 +481,26 @@ public class ModelService {
 
         // Retorna o valor específico ou o FALLBACK, se não houver dados limpos
         return cfiCleanMap.getOrDefault(normalizedName, FALLBACK_CFI);
+    }
+
+    public int getPeriodoBaseRevestimento(String navioId) {
+        RevestimentoDetail detail = revestimentosMap.get(navioId.trim());
+        if (detail != null) {
+            return detail.getPeriodoBaseVerificacao();
+        }
+        return 52;// media
+    }
+
+    /**
+     * Método que substitui o FALLBACK e busca o TIPO de CARGA/CLASSE do navio.
+     * ESSENCIAL para determinarHPILimite no PredictionService.
+     */
+    public String getShipClassType(String navioId) {
+        String normalizedName = navioId.trim().toUpperCase();
+        ShipDetail detail = shipDetailsMap.get(normalizedName);
+
+        // Retorna a Classe (Suezmax, Aframax, etc.) ou um fallback para a lógica HPI
+        return (detail != null) ? detail.getShipClass() : "UNKNOWN";
     }
 
 }
