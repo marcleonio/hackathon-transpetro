@@ -123,13 +123,4 @@ $$\mathbf{\text{C}_{\text{Extra}}} = \mathbf{\text{CFI}_{\text{Limpo}}} \times (
 
 Este é o valor em **Toneladas/Dia** que está sendo perdido devido à incrustação e que serve como base para o cálculo do **ROI da limpeza**.
 
----
-
-## 🤝 Contribuições
-
-Contribuições são muito bem-vindas! Se encontrar um bug ou tiver sugestões de melhoria (como adicionar a variável de custo do combustível ou novas *features* de *Feature Engineering*):
-
-1.  Crie um *fork* do projeto.
-2.  Crie sua *branch* de recurso (`git checkout -b feature/minha-feature`).
-3.  Faça o *commit* das suas alterações.
-4.  Abra um *Pull Request* claro e conciso.
+- Calvin

@@ -1,11 +1,10 @@
 import React from 'react';
 import { cn } from '../../utils';
 
-interface CardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onClick'> {
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   className?: string;
   hover?: boolean;
-  onClick?: () => void;
 }
 
 export const Card: React.FC<CardProps> = ({ children, className, hover = false, onClick, ...props }) => {

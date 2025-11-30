@@ -108,14 +108,28 @@ public class DataImportService {
     }
 
     /**
-     * Importa navios do CSV (processamento em lotes)
+     * Importa navios do CSV (versão com arquivo do resources)
      */
     public int importNaviosCSV(String filePath) throws IOException {
+        return importNaviosCSV(new ClassPathResource(filePath).getInputStream());
+    }
+
+    /**
+     * Importa navios do CSV enviado via upload (processamento em lotes)
+     */
+    public int importNaviosCSV(MultipartFile file) throws IOException {
+        return importNaviosCSV(file.getInputStream());
+    }
+
+    /**
+     * Importa navios do CSV a partir de um InputStream (processamento em lotes)
+     */
+    private int importNaviosCSV(java.io.InputStream inputStream) throws IOException {
         int imported = 0;
         List<Navio> naviosToSave = new ArrayList<>();
         final int BATCH_SIZE = 50;
         
-        try (Reader in = new InputStreamReader(new ClassPathResource(filePath).getInputStream())) {
+        try (Reader in = new InputStreamReader(inputStream)) {
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                 .builder()
                 .setHeader("Nome do navio", "Classe", "Tipo", "Porte Bruto", "Comprimento total (m)", "Boca (m)", "Calado (m)", "Pontal (m)")
@@ -207,15 +221,29 @@ public class DataImportService {
     }
 
     /**
-     * Importa docagens do CSV e associa aos navios (processamento em lotes)
+     * Importa docagens do CSV (versão com arquivo do resources)
      */
     public int importDocagemCSV(String filePath) throws IOException {
+        return importDocagemCSV(new ClassPathResource(filePath).getInputStream());
+    }
+
+    /**
+     * Importa docagens do CSV enviado via upload
+     */
+    public int importDocagemCSV(MultipartFile file) throws IOException {
+        return importDocagemCSV(file.getInputStream());
+    }
+
+    /**
+     * Importa docagens do CSV e associa aos navios (processamento em lotes)
+     */
+    private int importDocagemCSV(java.io.InputStream inputStream) throws IOException {
         int imported = 0;
         List<Docagem> docagensToSave = new ArrayList<>();
         final int BATCH_SIZE = 100;
         Map<String, Navio> navioCache = new HashMap<>();
         
-        try (Reader in = new InputStreamReader(new ClassPathResource(filePath).getInputStream())) {
+        try (Reader in = new InputStreamReader(inputStream)) {
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                 .builder()
                 .setHeader("Navio", "Docagem", "Tipo")
@@ -277,16 +305,30 @@ public class DataImportService {
     }
 
     /**
-     * Importa eventos de navegação do CSV e associa aos navios (processamento em lotes)
+     * Importa eventos de navegação do CSV (versão com arquivo do resources)
      */
     public int importEventosCSV(String filePath) throws IOException {
+        return importEventosCSV(new ClassPathResource(filePath).getInputStream());
+    }
+
+    /**
+     * Importa eventos de navegação do CSV enviado via upload
+     */
+    public int importEventosCSV(MultipartFile file) throws IOException {
+        return importEventosCSV(file.getInputStream());
+    }
+
+    /**
+     * Importa eventos de navegação do CSV e associa aos navios (processamento em lotes)
+     */
+    private int importEventosCSV(java.io.InputStream inputStream) throws IOException {
         int imported = 0;
         List<EventoNavegacao> eventosToSave = new ArrayList<>();
         final int BATCH_SIZE = 2000; // Aumentado para processar mais rápido
         Map<String, Navio> navioCache = new HashMap<>();
         Map<String, Boolean> sessionIdCache = new HashMap<>(); // Cache de sessionIds já verificados
         
-        try (Reader in = new InputStreamReader(new ClassPathResource(filePath).getInputStream())) {
+        try (Reader in = new InputStreamReader(inputStream)) {
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                 .builder()
                 .setSkipHeaderRecord(true)
@@ -414,15 +456,29 @@ public class DataImportService {
     }
 
     /**
-     * Importa consumos do CSV e associa aos navios (processamento em lotes)
+     * Importa consumos do CSV (versão com arquivo do resources)
      */
     public int importConsumosCSV(String filePath) throws IOException {
+        return importConsumosCSV(new ClassPathResource(filePath).getInputStream());
+    }
+
+    /**
+     * Importa consumos do CSV enviado via upload
+     */
+    public int importConsumosCSV(MultipartFile file) throws IOException {
+        return importConsumosCSV(file.getInputStream());
+    }
+
+    /**
+     * Importa consumos do CSV e associa aos navios (processamento em lotes)
+     */
+    private int importConsumosCSV(java.io.InputStream inputStream) throws IOException {
         int imported = 0;
         List<Consumo> consumosToSave = new ArrayList<>();
         final int BATCH_SIZE = 2000; // Aumentado para processar mais rápido
         Map<String, EventoNavegacao> eventoCache = new HashMap<>(); // Cache de eventos
         
-        try (Reader in = new InputStreamReader(new ClassPathResource(filePath).getInputStream())) {
+        try (Reader in = new InputStreamReader(inputStream)) {
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                 .builder()
                 .setHeader("SESSION_ID", "CONSUMED_QUANTITY", "DESCRIPTION")
@@ -504,15 +560,29 @@ public class DataImportService {
     }
 
     /**
-     * Importa revestimentos do CSV e associa aos navios (processamento em lotes)
+     * Importa revestimentos do CSV (versão com arquivo do resources)
      */
     public int importRevestimentosCSV(String filePath) throws IOException {
+        return importRevestimentosCSV(new ClassPathResource(filePath).getInputStream());
+    }
+
+    /**
+     * Importa revestimentos do CSV enviado via upload
+     */
+    public int importRevestimentosCSV(MultipartFile file) throws IOException {
+        return importRevestimentosCSV(file.getInputStream());
+    }
+
+    /**
+     * Importa revestimentos do CSV e associa aos navios (processamento em lotes)
+     */
+    private int importRevestimentosCSV(java.io.InputStream inputStream) throws IOException {
         int imported = 0;
         List<Revestimento> revestimentosToSave = new ArrayList<>();
         final int BATCH_SIZE = 50;
         Map<String, Navio> navioCache = new HashMap<>();
         
-        try (Reader in = new InputStreamReader(new ClassPathResource(filePath).getInputStream())) {
+        try (Reader in = new InputStreamReader(inputStream)) {
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                 .builder()
                 .setHeader("Sigla", "Nome do navio", "TipoClass", "TipoCarga", "ClasseNum", 

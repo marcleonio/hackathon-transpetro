@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
 import { CleaningSuggestion } from '../types';
-import { NAVIOS } from '../utils/constants';
 import { getCurrentHPI } from '../utils/hpiUtils';
 
 interface UseFiltersReturn {
@@ -21,7 +20,7 @@ export const useFilters = (
   const filteredShipIds = useMemo(() => {
     const searchLower = searchTerm.toLowerCase().trim();
     
-    return NAVIOS.filter((navioId) => {
+    return Object.keys(ships).filter((navioId) => {
       const shipData = ships[navioId];
 
       if (!shipData) {

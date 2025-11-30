@@ -6,15 +6,16 @@ import { useIntersectionObserver } from '../../hooks/useAnimation';
 
 interface FleetOverviewProps {
   ships: Record<string, CleaningSuggestion>;
+  totalNavios: number;
 }
 
-export const FleetOverview: React.FC<FleetOverviewProps> = ({ ships }) => {
+export const FleetOverview: React.FC<FleetOverviewProps> = ({ ships, totalNavios }) => {
   const { ref, hasIntersected } = useIntersectionObserver();
-  const shipArray = Object.values(ships);
-  const totalShips = shipArray.length;
-  const criticalShips = shipArray.filter((s) => s.nivelBioincrustacao >= 3).length;
-  const cleanShips = shipArray.filter((s) => s.nivelBioincrustacao <= 1).length;
-  const totalExtraFuel = shipArray.reduce((sum, s) => sum + s.maxExtraFuelTonPerDay, 0);
+  const shipArray = Object.values(ships).filter(s => s !== null && s !== undefined);
+  const totalShips = totalNavios || shipArray.length;
+  const criticalShips = shipArray.filter((s) => s && s.nivelBioincrustacao >= 3).length;
+  const cleanShips = shipArray.filter((s) => s && s.nivelBioincrustacao <= 1).length;
+  const totalExtraFuel = shipArray.reduce((sum, s) => sum + (s?.maxExtraFuelTonPerDay || 0), 0);
 
   const metrics = useMemo(
     () => [
