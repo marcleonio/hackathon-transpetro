@@ -30,7 +30,7 @@ public class RelatorioService {
 
     // Tipos de relatório válidos
     private static final List<String> TIPOS_VALIDOS = List.of("INSPECAO", "LIMPEZA", "OBSERVACAO", "CONSUMO");
-    
+
     // Status válidos
     private static final List<String> STATUS_VALIDOS = List.of("RASCUNHO", "FINALIZADO", "ARQUIVADO");
 
@@ -65,7 +65,7 @@ public class RelatorioService {
         // Converter anexos de String JSON para List<String>
         if (relatorio.getAnexos() != null && !relatorio.getAnexos().isEmpty()) {
             try {
-                List<String> anexosList = objectMapper.readValue(relatorio.getAnexos(), 
+                List<String> anexosList = objectMapper.readValue(relatorio.getAnexos(),
                     new TypeReference<List<String>>() {});
                 dto.setAnexos(anexosList);
             } catch (Exception e) {
@@ -83,7 +83,7 @@ public class RelatorioService {
      */
     private Relatorio toEntity(RelatorioRequestDto dto) {
         Relatorio relatorio = new Relatorio();
-        
+
         // Buscar navio pelo nome ou ID
         if (dto.getNavioId() != null && !dto.getNavioId().trim().isEmpty()) {
             String navioNome = dto.getNavioId().trim();
@@ -107,10 +107,10 @@ public class RelatorioService {
         relatorio.setCoordenadas(dto.getCoordenadas());
         relatorio.setObservacoesAdicionais(dto.getObservacoesAdicionais());
         relatorio.setRegistradoPor(dto.getRegistradoPor() != null ? dto.getRegistradoPor() : "Sistema");
-        
+
         // Status padrão se não informado
         relatorio.setStatus(dto.getStatus() != null ? dto.getStatus() : "RASCUNHO");
-        
+
         // Data de registro padrão se não informada
         relatorio.setDataRegistro(LocalDateTime.now());
 
@@ -154,14 +154,14 @@ public class RelatorioService {
 
         // Validações específicas por tipo
         if ("INSPECAO".equalsIgnoreCase(dto.getTipoRelatorio())) {
-            if (dto.getNivelBioincrustacao() != null && 
+            if (dto.getNivelBioincrustacao() != null &&
                 (dto.getNivelBioincrustacao() < 0 || dto.getNivelBioincrustacao() > 4)) {
                 throw new IllegalArgumentException("Nível de bioincrustação deve estar entre 0 e 4");
             }
         }
 
         if ("LIMPEZA".equalsIgnoreCase(dto.getTipoRelatorio())) {
-            if (dto.getTipoLimpeza() != null && 
+            if (dto.getTipoLimpeza() != null &&
                 !List.of("Parcial", "Completa", "Em Docagem").contains(dto.getTipoLimpeza())) {
                 throw new IllegalArgumentException("Tipo de limpeza inválido. Valores aceitos: Parcial, Completa, Em Docagem");
             }

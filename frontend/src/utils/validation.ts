@@ -7,13 +7,18 @@ export const isValidCleaningSuggestion = (
 
   const suggestion = data as Partial<CleaningSuggestion>;
 
+  // Validação mais flexível - permite valores padrão
   return (
     typeof suggestion.navioId === 'string' &&
+    suggestion.navioId.length > 0 &&
     typeof suggestion.nivelBioincrustacao === 'number' &&
+    !isNaN(suggestion.nivelBioincrustacao) &&
     typeof suggestion.cfiCleanTonPerDay === 'number' &&
+    !isNaN(suggestion.cfiCleanTonPerDay) &&
     typeof suggestion.maxExtraFuelTonPerDay === 'number' &&
-    typeof suggestion.diasParaIntervencao === 'number' &&
-    typeof suggestion.porcentagemComprometimentoAtual === 'number' &&
+    !isNaN(suggestion.maxExtraFuelTonPerDay) &&
+    (typeof suggestion.diasParaIntervencao === 'number' || suggestion.diasParaIntervencao === undefined) &&
+    (typeof suggestion.porcentagemComprometimentoAtual === 'number' || suggestion.porcentagemComprometimentoAtual === undefined) &&
     Array.isArray(suggestion.predictions) &&
     (suggestion.dataUltimaLimpeza === null ||
       typeof suggestion.dataUltimaLimpeza === 'string') &&

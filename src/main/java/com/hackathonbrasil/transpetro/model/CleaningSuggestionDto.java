@@ -49,7 +49,7 @@ public class CleaningSuggestionDto {
 
     private double cfiCleanTonPerDay; // Consumo ideal em Toneladas/Dia (ex: 50.0)
     private double maxExtraFuelTonPerDay; // O máximo de combustível extra diário desperdiçado na projeção
-    private double porcentagemComprometimentoAtual;
+    private double dragIncreasePercent;
 
     /**
      * Lista completa das previsões diárias (Data e HPI) para o horizonte de 180 dias.
