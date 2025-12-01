@@ -12,10 +12,32 @@ Este projeto implementa um modelo preditivo para calcular o **HPI (Hull Performa
 
 ### 🛠️ Tecnologias Utilizadas
 
-* **Backend:** Java, Spring Boot, H2 Database
-* **Modelo Analítico:** Regressão Linear Múltipla (OLS)
-* **Frontend:** React 18, TypeScript, Tailwind CSS, Vite
-* **Dados:** Arquivos CSV históricos de eventos e consumo (`ResultadoQueryEventos.csv`).
+* **Backend:**
+  - Java 17
+  - Spring Boot 3.5.7
+  - H2 Database (banco em memória/arquivo)
+  - Apache Commons Math (para regressão linear)
+  - Swagger/OpenAPI (documentação da API)
+
+* **Modelo Analítico:**
+  - Regressão Linear Múltipla (OLS - Ordinary Least Squares)
+  - Feature Engineering personalizado
+  - Cálculo dinâmico de HPI baseado em características do navio
+
+* **Frontend:**
+  - React 18.2
+  - TypeScript 5.2
+  - Tailwind CSS 3.3
+  - Vite 5.0 (build tool e dev server)
+  - Recharts 2.10 (gráficos)
+  - Axios 1.6 (requisições HTTP)
+  - React Router 6.20 (roteamento)
+  - Lucide React (ícones)
+
+* **Dados:**
+  - Arquivos CSV históricos de eventos e consumo (`ResultadoQueryEventos.csv`)
+  - Dados de docagem e revestimento
+  - Informações de características dos navios
 
 ---
 
@@ -23,13 +45,17 @@ Este projeto implementa um modelo preditivo para calcular o **HPI (Hull Performa
 
 ### 1. Pré-requisitos
 
-Certifique-se de que os seguintes softwares estão instalados em seu ambiente:
+#### Backend
+* **JDK 17 ou superior** - Verifique com `java -version`
+* **Maven 3.6+** - Verifique com `mvn -version`
+* **IDE** (opcional, mas recomendado: IntelliJ IDEA, VS Code, Eclipse)
 
-* **JDK 17 ou superior**
-* **Maven** (para gerenciamento de dependências e build)
-* **IDE** (IntelliJ IDEA, VS Code, Eclipse)
+#### Frontend
+* **Node.js 18+** - Verifique com `node -v`
+* **npm 9+** ou **yarn** - Verifique com `npm -v`
+* **Git** (para clonar o repositório)
 
-### 2. Configuração do Ambiente
+### 2. Configuração do Backend
 
 1.  **Clone o Repositório:**
     ```bash
@@ -39,8 +65,9 @@ Certifique-se de que os seguintes softwares estão instalados em seu ambiente:
 
 2.  **Base de Dados:**
     * O arquivo de dados **`ResultadoQueryEventos.csv`** (ou similar) deve estar localizado em `src/main/resources/data/`.
+    * O banco de dados H2 será criado automaticamente na primeira execução em `./data/transpetro.mv.db`.
 
-3.  **Compilação e Execução (Via Maven):**
+3.  **Compilação e Execução:**
     ```bash
     # Limpa, compila e empacota o projeto
     mvn clean install
@@ -49,25 +76,92 @@ Certifique-se de que os seguintes softwares estão instalados em seu ambiente:
     mvn spring-boot:run
     ```
 
-O backend estará acessível em `http://localhost:8080`.
+    **Alternativa usando o wrapper Maven:**
+    ```bash
+    # No Windows
+    ./mvnw.cmd spring-boot:run
 
-### 3. Frontend
+    # No Linux/Mac
+    ./mvnw spring-boot:run
+    ```
 
-```bash
-# 1. Entrar na pasta do frontend
-cd frontend
+4.  **Verificação:**
+    * O backend estará acessível em `http://localhost:8080`
+    * Acesse `http://localhost:8080/swagger-ui/index.html` para ver a documentação da API
+    * Acesse `http://localhost:8080/h2-console` para o console do banco H2 (JDBC URL: `jdbc:h2:file:./data/transpetro`)
 
-# 2. Instalar dependências
-npm install
+### 3. Configuração do Frontend
 
-# 3. Executar o servidor de desenvolvimento
-npm run dev
-```
+1.  **Navegue até a pasta do frontend:**
+    ```bash
+    cd frontend
+    ```
 
-O frontend estará disponível em `http://localhost:5173`
+2.  **Instale as dependências:**
+    ```bash
+    npm install
+    ```
 
-**Pré-requisitos do Frontend:**
-- Node.js 18+ e npm 9+
+3.  **Configure variáveis de ambiente (opcional):**
+    * Crie um arquivo `.env` na pasta `frontend/` se precisar alterar a URL da API:
+    ```env
+    VITE_API_URL=http://localhost:8080/api/v1
+    ```
+    * Por padrão, o frontend usa o proxy do Vite configurado em `vite.config.ts` que redireciona `/api` para `http://localhost:8080`.
+
+4.  **Execute o servidor de desenvolvimento:**
+    ```bash
+    npm run dev
+    ```
+
+5.  **Acesse o frontend:**
+    * O frontend estará disponível em `http://localhost:3000` (ou outra porta se 3000 estiver ocupada)
+    * O Vite mostrará a porta exata no terminal após iniciar
+
+### 4. Executando o Projeto Completo
+
+**Ordem recomendada de inicialização:**
+
+1. **Primeiro, inicie o backend:**
+   ```bash
+   # No diretório raiz do projeto
+   mvn spring-boot:run
+   ```
+   Aguarde até ver a mensagem: `Started TranspetroApplication`
+
+2. **Depois, inicie o frontend:**
+   ```bash
+   # Em outro terminal, na pasta frontend
+   cd frontend
+   npm run dev
+   ```
+
+3. **Acesse a aplicação:**
+   - Frontend: `http://localhost:3000` (ou a porta indicada pelo Vite)
+   - Backend API: `http://localhost:8080`
+   - Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+
+### 5. Troubleshooting
+
+#### Backend não inicia
+- Verifique se a porta 8080 está livre: `lsof -i :8080` (Mac/Linux) ou `netstat -ano | findstr :8080` (Windows)
+- Verifique se o JDK 17+ está instalado: `java -version`
+- Verifique os logs no console para erros específicos
+
+#### Frontend não conecta ao backend
+- Certifique-se de que o backend está rodando em `http://localhost:8080`
+- Verifique se há erros de CORS no console do navegador (F12)
+- Verifique a configuração do proxy em `frontend/vite.config.ts`
+
+#### Erro ao instalar dependências do frontend
+- Limpe o cache do npm: `npm cache clean --force`
+- Delete `node_modules` e `package-lock.json`, depois execute `npm install` novamente
+- Verifique se está usando Node.js 18+: `node -v`
+
+#### Dados não aparecem no dashboard
+- Verifique se o backend está processando os dados corretamente (veja logs do Spring Boot)
+- Verifique o console do navegador (F12) para erros de requisição
+- Certifique-se de que há navios cadastrados no banco de dados ou que a lista hardcoded está sendo usada
 
 ---
 
@@ -118,13 +212,23 @@ $$\mathbf{http://localhost:8080/swagger-ui/index.html}$$
 
 O dashboard de visualização da frota é a melhor forma de consumir a solução:
 
-1.  Certifique-se de que o backend está rodando em `http://localhost:8080`.
-2.  Inicie o frontend com `npm run dev` na pasta `frontend/`.
-3.  Abra o seguinte link no seu navegador:
+1.  **Certifique-se de que o backend está rodando** em `http://localhost:8080`.
+2.  **Inicie o frontend** com `npm run dev` na pasta `frontend/`.
+3.  **Acesse o dashboard** no navegador:
     ```
-    http://localhost:5173
+    http://localhost:3000
     ```
-O frontend fará requisições assíncronas para carregar o resumo de todos os navios e seus respectivos gráficos de projeção.
+    *Nota: Se a porta 3000 estiver ocupada, o Vite usará automaticamente outra porta (ex: 3001, 3002, etc.). Verifique a porta exata no terminal onde o frontend está rodando.*
+
+### Funcionalidades do Dashboard
+
+- **Visão Geral da Frota:** Métricas agregadas (total de navios, navios críticos, navios limpos, consumo extra total)
+- **Análise de Distribuição:** Gráficos de distribuição de navios por nível de bioincrustação
+- **Detalhes por Navio:** Visualização individual com gráficos de projeção HPI, consumo extra e estimativa de comprometimento do casco
+- **Filtros e Busca:** Filtragem por nível de bioincrustação e busca por nome do navio
+- **Exportação:** Exportação de dados para CSV
+
+O frontend fará requisições assíncronas para carregar o resumo de todos os navios e seus respectivos gráficos de projeção. Os dados são carregados em lotes para otimizar a performance.
 
 ---
 
