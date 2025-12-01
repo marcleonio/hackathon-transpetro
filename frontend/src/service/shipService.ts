@@ -158,7 +158,7 @@ export const shipService = {
           // Se não conseguir processar, continua com o tratamento de erro normal
         }
       }
-      handleApiError(error, trimmedNavioId);
+      throw handleApiError(error, trimmedNavioId);
     }
   },
 

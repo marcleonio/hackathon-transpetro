@@ -1,8 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Dashboard } from './pages/Dashboard';
-import { NaviosPage } from './pages/NaviosPage';
-import { NavioFormPage } from './pages/NavioFormPage';
-import { RelatoriosPage } from './pages/RelatoriosPage';
 
 function App() {
   return (

@@ -1,6 +1,5 @@
 import React from 'react';
 import { BiofoulingLevel } from '../../types';
-import { BIOFOULING_LEVELS } from '../../utils/constants';
 import { cn } from '../../utils';
 import { CheckCircle, AlertCircle, AlertTriangle, XCircle, AlertOctagon } from 'lucide-react';
 

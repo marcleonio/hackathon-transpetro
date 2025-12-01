@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
 import { CleaningSuggestion } from '../types';
-import { getCurrentHPI } from '../utils/hpiUtils';
 
 interface UseFiltersReturn {
   searchTerm: string;

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Filter, ChevronDown, X } from 'lucide-react';
-import { cn } from '../../utils';
 
 interface FilterPanelProps {
   selectedLevel: number | null;

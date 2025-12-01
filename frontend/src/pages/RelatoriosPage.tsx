@@ -9,7 +9,6 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { Badge } from '../components/ui/Badge';
 import { ConfirmModal } from '../components/modals/ConfirmModal';
 import { Plus, Edit, Trash2, FileText } from 'lucide-react';
-import { Relatorio } from '../types';
 import { format } from 'date-fns';
 import ptBR from 'date-fns/locale/pt-BR';
 import { cn } from '../utils';

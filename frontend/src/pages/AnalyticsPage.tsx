@@ -1,16 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useShips } from '../hooks/useShips';
-import { useSidebar } from '../hooks/useSidebar';
-import { useIntersectionObserver } from '../hooks/useAnimation';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Header } from '../components/layout/Header';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { BarChart3, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Download, Filter, Calendar, Zap } from 'lucide-react';
+import { BarChart3, TrendingUp, AlertTriangle, CheckCircle, Download, Zap } from 'lucide-react';
 import { cn } from '../utils';
 import { getCurrentHPI } from '../utils/hpiUtils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
-import { exportToCSV } from '../utils/exportUtils';
 import { Button } from '../components/ui/Button';
 import { formatDate } from '../utils/dateUtils';
 

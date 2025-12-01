@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useShips } from '../hooks/useShips';
-import { useSidebar } from '../hooks/useSidebar';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Header } from '../components/layout/Header';
 import { HPIChart } from '../components/widgets/HPIChart';
@@ -13,13 +12,7 @@ import {
   Calendar,
   Fuel,
   TrendingUp,
-  Bell,
-  MessageSquare,
-  Settings,
-  User,
   AlertTriangle,
-  CheckCircle,
-  Clock,
   Search,
   AlertCircle,
 } from 'lucide-react';
@@ -56,7 +49,7 @@ export const ShipDetailPage: React.FC<ShipDetailPageProps> = ({
     { id: 1, type: 'warning', message: 'HPI acima do limite crítico', date: new Date(), read: false },
     { id: 2, type: 'info', message: 'Limpeza recomendada em 15 dias', date: new Date(), read: false },
   ]);
-  const [messages, setMessages] = useState([
+  const [messages] = useState([
     { id: 1, from: 'Sistema', subject: 'Alerta de HPI', body: 'O HPI deste navio está acima do limite crítico.', date: new Date() },
   ]);
 

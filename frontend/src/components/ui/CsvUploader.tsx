@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Upload, Loader, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, Loader } from 'lucide-react';
 import { Button } from './Button';
 import { cn } from '../../utils';
 import { ImportResult } from '../../service/dataImportService';
@@ -15,10 +15,7 @@ interface CsvUploaderProps {
 }
 
 export const CsvUploader: React.FC<CsvUploaderProps> = ({
-  title,
-  description,
   onUpload,
-  result,
   importing,
   onImportingChange,
   id,
