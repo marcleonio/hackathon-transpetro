@@ -47,10 +47,7 @@ COPY --from=frontend-builder /app/frontend/dist ./hackathon-transpetro-backend/s
 # Este comando agora deve funcionar, pois a estrutura de pastas do Maven está correta.
 RUN mvn clean install -DskipTests
 
-# Define o nome do arquivo JAR que será gerado pelo Maven.
-# Você deve garantir que 'transpetro-0.0.1-SNAPSHOT.jar' corresponde ao nome e versão no seu pom.xml.
-# Este ARG deve vir antes da próxima etapa FROM para ser usado nela.
-ARG JAR_FILE=hackathon-transpetro-backend/target/transpetro-0.0.1-SNAPSHOT.jar
+# REMOVIDO: ARG JAR_FILE não é mais necessário, pois usaremos um wildcard no COPY.
 
 # ===============================================
 # STAGE 3: IMAGEM FINAL DE EXECUÇÃO
@@ -62,7 +59,9 @@ FROM openjdk:17.0.1-jdk-slim
 WORKDIR /app
 
 # Copia o JAR construído da Stage 2 para a imagem final
-COPY --from=backend-builder ${JAR_FILE} app.jar
+# CORREÇÃO: Usamos um wildcard (*.jar) para garantir que o nome exato do JAR (que inclui a versão/snapshot)
+# seja copiado corretamente, resolvendo o erro 'Invalid or corrupt jarfile'.
+COPY --from=backend-builder /app/hackathon-transpetro-backend/target/*.jar app.jar
 
 # O Render espera que a aplicação escute na porta 10000
 EXPOSE 10000
