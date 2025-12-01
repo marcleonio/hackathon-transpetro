@@ -7,7 +7,7 @@ FROM node:18-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 # Copia os arquivos de dependência do React
-# A pasta do frontend é hackathon-transpetro-frontend
+# A pasta do frontend é frontend
 COPY frontend/package*.json ./
 
 # Instala as dependências do React
@@ -39,7 +39,7 @@ COPY ./ ./hackathon-transpetro-backend/
 RUN mkdir -p hackathon-transpetro-backend/src/main/resources/static
 
 # Copia os arquivos estáticos construídos pelo React para a pasta de recursos estáticos do Spring Boot
-COPY --from=frontend-builder /app/frontend/build ./hackathon-transpetro-backend/src/main/resources/static
+COPY --from=frontend-builder /app/frontend/dist ./hackathon-transpetro-backend/src/main/resources/static
 
 # Constrói o JAR final do Spring Boot (com os arquivos do React dentro)
 RUN mvn clean install -DskipTests
