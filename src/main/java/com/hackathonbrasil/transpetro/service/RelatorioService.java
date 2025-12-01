@@ -218,7 +218,6 @@ public class RelatorioService {
         relatorio.setStatus(dto.getStatus() != null ? dto.getStatus() : relatorio.getStatus());
         relatorio.setCoordenadas(dto.getCoordenadas());
         relatorio.setObservacoesAdicionais(dto.getObservacoesAdicionais());
-
         if (dto.getRegistradoPor() != null) {
             relatorio.setRegistradoPor(dto.getRegistradoPor());
         }
@@ -346,4 +345,3 @@ public class RelatorioService {
         relatorioRepository.deleteById(id);
     }
 }
-

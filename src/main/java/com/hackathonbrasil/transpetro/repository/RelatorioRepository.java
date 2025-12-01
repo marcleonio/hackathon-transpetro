@@ -54,4 +54,3 @@ public interface RelatorioRepository extends JpaRepository<Relatorio, Long> {
            "ORDER BY r.dataRegistro DESC")
     List<Relatorio> buscarPorNavioETermo(@Param("navioId") String navioId, @Param("termo") String termo);
 }
-

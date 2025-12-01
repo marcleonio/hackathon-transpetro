@@ -4,9 +4,6 @@ import com.hackathonbrasil.transpetro.model.ConsolidatedRecord;
 import com.hackathonbrasil.transpetro.model.RevestimentoDetail;
 import com.hackathonbrasil.transpetro.model.ShipDetail;
 import com.hackathonbrasil.transpetro.model.TrainingDataRecord;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import com.hackathonbrasil.transpetro.model.Navio;
 import com.hackathonbrasil.transpetro.repository.DocagemRepository;
 import com.hackathonbrasil.transpetro.repository.NavioRepository;
@@ -24,7 +21,6 @@ import java.io.Reader;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class ModelService {
@@ -71,10 +67,10 @@ public class ModelService {
 
     /**
      * Lê o arquivo de docagem e retorna a data de docagem mais recente para cada navio.
-     * Também busca dados do banco de dados.
+     * PRIORIDADE: Dados do banco de dados sobrescrevem dados do CSV.
      */
     private Map<String, LocalDate> loadDockingDates(String filePath) throws IOException {
-        // 1. Carregar do CSV (como está hoje)
+        // 1. Carregar do CSV (fallback para dados históricos)
         try (Reader in = new FileReader(new ClassPathResource(filePath).getFile())) {
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                     .builder()
@@ -92,20 +88,21 @@ public class ModelService {
                 LocalDate dockingDate = parseDockingDate(dateString);
 
                 if (dockingDate != null) {
-                    lastDockingMap.compute(shipName, (k, existingDate) ->
-                        (existingDate == null || dockingDate.isAfter(existingDate)) ? dockingDate : existingDate
-                    );
+                    // Só adiciona se não existir no banco (será sobrescrito abaixo se existir)
+                    lastDockingMap.computeIfAbsent(shipName, k -> dockingDate);
                 }
             }
+        } catch (IOException e) {
+            System.err.println("Erro ao ler arquivo de docagem: " + e.getMessage());
         }
 
-        // 2. Carregar do banco de dados
+        // 2. PRIORIDADE: Carregar do banco de dados e sobrescrever dados do CSV
         navioRepository.findAll().forEach(navio -> {
             String navioNome = normalizeShipId(navio.getNome());
             docagemRepository.findUltimaDocagemByNavioId(navio.getId())
                 .ifPresent(docagem -> {
                     LocalDate dataDocagem = docagem.getDataDocagem();
-                    // Se não existe no map ou se a data do banco é mais recente, usar a do banco
+                    // Sobrescreve dados do CSV com dados do banco (sempre mais atualizados)
                     lastDockingMap.compute(navioNome, (k, existingDate) ->
                         (existingDate == null || dataDocagem.isAfter(existingDate)) ? dataDocagem : existingDate
                     );
@@ -562,22 +559,19 @@ public class ModelService {
         // Normaliza o nome do navio para MAIÚSCULAS antes da busca
         String normalizedName = normalizeShipId(shipName);
 
-        // 1. Busca no mapa (dados do CSV)
-        LocalDate dateFromMap = lastDockingMap.get(normalizedName);
+        // 1. PRIORIDADE: Busca no banco de dados primeiro (dados mais atualizados)
+        Optional<LocalDate> dbDate = navioRepository.findByNome(normalizedName)
+            .flatMap(navio -> docagemRepository.findUltimaDocagemByNavioId(navio.getId()))
+            .map(docagem -> docagem.getDataDocagem());
         
-        // 2. Busca no banco de dados
-        navioRepository.findByNome(normalizedName)
-            .ifPresent(navio -> {
-                docagemRepository.findUltimaDocagemByNavioId(navio.getId())
-                    .ifPresent(docagem -> {
-                        LocalDate dbDate = docagem.getDataDocagem();
-                        // Se não existe no map ou se a data do banco é mais recente, usar a do banco
-                        if (dateFromMap == null || dbDate.isAfter(dateFromMap)) {
-                            lastDockingMap.put(normalizedName, dbDate);
-                        }
-                    });
-            });
+        if (dbDate.isPresent()) {
+            LocalDate date = dbDate.get();
+            // Atualiza o cache
+            lastDockingMap.put(normalizedName, date);
+            return date;
+        }
 
+        // 2. Fallback: Busca no mapa (dados do CSV)
         return lastDockingMap.get(normalizedName);
     }
 
@@ -595,17 +589,37 @@ public class ModelService {
     public int getPeriodoBaseRevestimento(String navioId) {
         String normalizedName = normalizeShipId(navioId);
         
-        // 1. Busca no mapa (dados do CSV)
+        // 1. PRIORIDADE: Busca no banco de dados primeiro (dados mais atualizados)
+        Optional<Integer> dbPeriodo = navioRepository.findByNome(normalizedName)
+            .flatMap(navio -> revestimentoRepository.findUltimoRevestimentoByNavioId(navio.getId()))
+            .map(rev -> rev.getPeriodoBaseVerificacao());
+        
+        if (dbPeriodo.isPresent()) {
+            int periodo = dbPeriodo.get();
+            // Atualiza o cache se necessário
+            RevestimentoDetail existingDetail = revestimentosMap.get(normalizedName);
+            if (existingDetail == null || existingDetail.getPeriodoBaseVerificacao() != periodo) {
+                navioRepository.findByNome(normalizedName)
+                    .flatMap(navio -> revestimentoRepository.findUltimoRevestimentoByNavioId(navio.getId()))
+                    .ifPresent(rev -> {
+                        RevestimentoDetail detail = new RevestimentoDetail(
+                            normalizedName,
+                            rev.getPeriodoBaseVerificacao(),
+                            rev.getDataAplicacao()
+                        );
+                        revestimentosMap.put(normalizedName, detail);
+                    });
+            }
+            return periodo;
+        }
+
+        // 2. Fallback: Busca no mapa (dados do CSV)
         RevestimentoDetail detail = revestimentosMap.get(normalizedName);
         if (detail != null) {
             return detail.getPeriodoBaseVerificacao();
         }
 
-        // 2. Busca no banco de dados
-        return navioRepository.findByNome(normalizedName)
-            .flatMap(navio -> revestimentoRepository.findUltimoRevestimentoByNavioId(navio.getId()))
-            .map(rev -> rev.getPeriodoBaseVerificacao())
-            .orElse(52); // média padrão
+        return 52; // média padrão
     }
 
     /**
@@ -615,16 +629,37 @@ public class ModelService {
     public String getShipClassType(String navioId) {
         String normalizedName = normalizeShipId(navioId);
         
-        // 1. Busca no mapa (dados do CSV)
+        // 1. PRIORIDADE: Busca no banco de dados primeiro (dados mais atualizados)
+        Optional<String> dbClasse = navioRepository.findByNome(normalizedName)
+            .map(Navio::getClasse)
+            .filter(classe -> classe != null && !classe.isEmpty());
+        
+        if (dbClasse.isPresent()) {
+            String classe = dbClasse.get();
+            // Atualiza o cache se necessário
+            ShipDetail existingDetail = shipDetailsMap.get(normalizedName);
+            if (existingDetail == null || !classe.equals(existingDetail.getShipClass())) {
+                Navio navio = navioRepository.findByNome(normalizedName).orElse(null);
+                if (navio != null && navio.getPorteBruto() != null && navio.getPorteBruto() > 0) {
+                    ShipDetail detail = new ShipDetail(
+                        normalizedName,
+                        classe,
+                        navio.getTipo() != null ? navio.getTipo() : "UNKNOWN",
+                        navio.getPorteBruto()
+                    );
+                    shipDetailsMap.put(normalizedName, detail);
+                }
+            }
+            return classe;
+        }
+
+        // 2. Fallback: Busca no mapa (dados do CSV)
         ShipDetail detail = shipDetailsMap.get(normalizedName);
         if (detail != null) {
             return detail.getShipClass();
         }
 
-        // 2. Busca no banco de dados
-        return navioRepository.findByNome(normalizedName)
-            .map(Navio::getClasse)
-            .orElse("UNKNOWN");
+        return "UNKNOWN";
     }
 
 }

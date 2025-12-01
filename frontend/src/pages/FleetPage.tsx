@@ -34,7 +34,7 @@ export const FleetPage: React.FC<FleetPageProps> = ({
   onToggle,
 }) => {
   const navigate = useNavigate();
-  const { ships, errors, loading } = useShips();
+  const { ships, errors, loading, totalNavios } = useShips();
   const {
     searchTerm,
     selectedLevel,
@@ -74,7 +74,7 @@ export const FleetPage: React.FC<FleetPageProps> = ({
     );
   }
 
-  const totalShips = Object.keys(ships).length;
+  const totalShips = totalNavios || Object.keys(ships).length;
   const criticalShips = Object.values(ships).filter((s) => s.nivelBioincrustacao >= 3).length;
 
   return (

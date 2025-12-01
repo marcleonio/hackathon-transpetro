@@ -1,6 +1,7 @@
 import React from 'react';
-import { Home, Ship, BarChart3, Settings, LogOut, ChevronLeft, ChevronRight, GitCompare } from 'lucide-react';
+import { Home, Ship, BarChart3, Settings, LogOut, ChevronLeft, ChevronRight, GitCompare, FileText, Anchor, Wrench } from 'lucide-react';
 import { cn } from '../../utils';
+import { SilecLogo } from '../ui/SilecLogo';
 
 interface SidebarProps {
   activeView: string;
@@ -16,6 +17,9 @@ const menuItems = [
   { id: 'fleet', label: 'Frota', icon: Ship },
   { id: 'analytics', label: 'Analíticos', icon: BarChart3 },
   { id: 'compare', label: 'Comparar', icon: GitCompare },
+  { id: 'navios', label: 'Navios', icon: Anchor },
+  { id: 'docagens', label: 'Docagens', icon: Wrench },
+  { id: 'relatorios', label: 'Relatórios', icon: FileText },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -43,16 +47,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       >
         <div className="p-6 flex flex-col h-full">
-          <div className="mb-8 relative">
-            <div className={cn('flex items-center gap-4', !isOpen && 'justify-center')}>
-              <div className="w-12 h-12 bg-gradient-to-br from-petrobras-blue to-blue-600 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
-                <Ship className="h-7 w-7 text-white" />
-              </div>
-              {isOpen && (
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-xl font-bold text-gray-900 truncate">Transpetro</h1>
-                  <p className="text-xs text-gray-500 font-medium">HPI Monitor</p>
-                </div>
+          <div className="mb-6 relative">
+            <div className={cn('flex items-center gap-2', !isOpen && 'justify-center')}>
+              {isOpen ? (
+                <SilecLogo size="md" showText={true} />
+              ) : (
+                <SilecLogo size="sm" showText={false} />
               )}
             </div>
             {!isMobile && (

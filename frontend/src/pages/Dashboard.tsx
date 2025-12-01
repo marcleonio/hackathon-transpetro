@@ -18,6 +18,12 @@ import { AnalyticsPage } from './AnalyticsPage';
 import { ComparePage } from './ComparePage';
 import { ShipDetailPage } from './ShipDetailPage';
 import { SettingsPage } from './SettingsPage';
+import { NaviosPage } from './NaviosPage';
+import { NavioFormPage } from './NavioFormPage';
+import { RelatoriosPage } from './RelatoriosPage';
+import { RelatorioFormPage } from './RelatorioFormPage';
+import { DocagensPage } from './DocagensPage';
+import { DocagemFormPage } from './DocagemFormPage';
 import { Button } from '../components/ui/Button';
 import { CleaningSuggestion } from '../types';
 import { getCurrentHPI } from '../utils/hpiUtils';
@@ -31,10 +37,13 @@ export const Dashboard: React.FC = () => {
     if (location.pathname === '/analytics') return 'analytics';
     if (location.pathname === '/compare') return 'compare';
     if (location.pathname === '/settings') return 'settings';
+    if (location.pathname.startsWith('/navios')) return 'navios';
+    if (location.pathname.startsWith('/relatorios')) return 'relatorios';
+    if (location.pathname.startsWith('/docagens')) return 'docagens';
     return 'dashboard';
   });
   const { isOpen, isMobile, toggle, close } = useSidebar();
-  const { ships, errors, loading } = useShips();
+  const { ships, errors, loading, totalNavios } = useShips();
   const { searchTerm, setSearchTerm } = useFilters(ships);
   const [selectedShip, setSelectedShip] = useState<CleaningSuggestion | null>(null);
 
@@ -76,6 +85,12 @@ export const Dashboard: React.FC = () => {
       setActiveView('compare');
     } else if (location.pathname === '/settings') {
       setActiveView('settings');
+    } else     if (location.pathname.startsWith('/navios')) {
+      setActiveView('navios');
+    } else if (location.pathname.startsWith('/relatorios')) {
+      setActiveView('relatorios');
+    } else if (location.pathname.startsWith('/docagens')) {
+      setActiveView('docagens');
     } else if (location.pathname === '/') {
       setActiveView('dashboard');
     }
@@ -91,6 +106,12 @@ export const Dashboard: React.FC = () => {
       navigate('/compare');
     } else if (view === 'settings') {
       navigate('/settings');
+    } else if (view === 'navios') {
+      navigate('/navios');
+    } else if (view === 'relatorios') {
+      navigate('/relatorios');
+    } else if (view === 'docagens') {
+      navigate('/docagens');
     } else {
       navigate('/');
     }
@@ -144,6 +165,81 @@ export const Dashboard: React.FC = () => {
     return (
       <SettingsPage
         activeView={activeView}
+        onViewChange={handleViewChange}
+        isOpen={isOpen}
+        isMobile={isMobile}
+        onClose={close}
+        onToggle={toggle}
+      />
+    );
+  }
+
+  if (location.pathname.startsWith('/navios')) {
+    if (location.pathname === '/navios/novo' || location.pathname.match(/^\/navios\/\d+$/)) {
+      return (
+        <NavioFormPage
+          activeView="navios"
+          onViewChange={handleViewChange}
+          isOpen={isOpen}
+          isMobile={isMobile}
+          onClose={close}
+          onToggle={toggle}
+        />
+      );
+    }
+    return (
+      <NaviosPage
+        activeView="navios"
+        onViewChange={handleViewChange}
+        isOpen={isOpen}
+        isMobile={isMobile}
+        onClose={close}
+        onToggle={toggle}
+      />
+    );
+  }
+
+  if (location.pathname.startsWith('/relatorios')) {
+    if (location.pathname === '/relatorios/novo' || location.pathname.match(/^\/relatorios\/\d+$/)) {
+      return (
+        <RelatorioFormPage
+          activeView="relatorios"
+          onViewChange={handleViewChange}
+          isOpen={isOpen}
+          isMobile={isMobile}
+          onClose={close}
+          onToggle={toggle}
+        />
+      );
+    }
+    return (
+      <RelatoriosPage
+        activeView="relatorios"
+        onViewChange={handleViewChange}
+        isOpen={isOpen}
+        isMobile={isMobile}
+        onClose={close}
+        onToggle={toggle}
+      />
+    );
+  }
+
+  if (location.pathname.startsWith('/docagens')) {
+    if (location.pathname === '/docagens/novo' || location.pathname.match(/^\/docagens\/\d+$/)) {
+      return (
+        <DocagemFormPage
+          activeView="docagens"
+          onViewChange={handleViewChange}
+          isOpen={isOpen}
+          isMobile={isMobile}
+          onClose={close}
+          onToggle={toggle}
+        />
+      );
+    }
+    return (
+      <DocagensPage
+        activeView="docagens"
         onViewChange={handleViewChange}
         isOpen={isOpen}
         isMobile={isMobile}
@@ -235,7 +331,7 @@ export const Dashboard: React.FC = () => {
             </div>
 
             <div className="mb-8">
-              <FleetOverview ships={ships} />
+              <FleetOverview ships={ships} totalNavios={totalNavios} />
             </div>
 
             {Object.keys(errors).length > 0 && (

@@ -1,5 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Search, Bell, MessageSquare, User, Menu } from 'lucide-react';
+import { NotificationsModal } from '../modals/NotificationsModal';
+import { MessagesModal } from '../modals/MessagesModal';
+import { ProfileModal } from '../modals/ProfileModal';
 
 interface HeaderProps {
   searchTerm: string;
@@ -13,6 +16,10 @@ export const Header: React.FC<HeaderProps> = ({
   onSearchChange,
   onMenuToggle,
 }) => {
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [messagesOpen, setMessagesOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+
   return (
     <header className="bg-white/80 backdrop-blur-lg border-b border-gray-100 sticky top-0 z-40 shadow-sm">
       <div className="px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
@@ -39,25 +46,42 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2 lg:gap-4">
-            <button className="p-2 lg:p-3 text-gray-600 hover:bg-gray-100 rounded-xl transition-all duration-200 relative group hover:scale-110 hidden sm:flex">
+            <button
+              onClick={() => setMessagesOpen(true)}
+              className="p-2 lg:p-3 text-gray-600 hover:bg-gray-100 rounded-xl transition-all duration-200 relative group hover:scale-110 hidden sm:flex"
+              aria-label="Mensagens"
+            >
               <MessageSquare className="h-5 w-5 group-hover:text-petrobras-blue group-hover:rotate-12 transition-all duration-200" />
             </button>
-            <button className="p-2 lg:p-3 text-gray-600 hover:bg-gray-100 rounded-xl transition-all duration-200 relative group hover:scale-110">
+            <button
+              onClick={() => setNotificationsOpen(true)}
+              className="p-2 lg:p-3 text-gray-600 hover:bg-gray-100 rounded-xl transition-all duration-200 relative group hover:scale-110"
+              aria-label="Notificações"
+            >
               <Bell className="h-5 w-5 group-hover:text-petrobras-blue group-hover:animate-pulse" />
               <span className="absolute top-1.5 right-1.5 lg:top-2 lg:right-2 w-2 h-2 lg:w-2.5 lg:h-2.5 bg-petrobras-yellow rounded-full border-2 border-white shadow-sm animate-pulse" />
             </button>
             <div className="flex items-center gap-2 lg:gap-3 pl-2 lg:pl-5 border-l-2 border-gray-100">
-              <div className="w-9 h-9 lg:w-11 lg:h-11 bg-gradient-to-br from-petrobras-blue to-blue-600 rounded-xl lg:rounded-2xl flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-200">
-                <User className="h-5 w-5 lg:h-6 lg:w-6 text-white" />
-              </div>
-              <div className="text-left hidden sm:block">
-                <p className="text-xs lg:text-sm font-bold text-gray-900">Admin</p>
-                <p className="text-xs text-gray-500 font-medium hidden lg:block">admin@transpetro.com</p>
-              </div>
+              <button
+                onClick={() => setProfileOpen(true)}
+                className="flex items-center gap-2 lg:gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                aria-label="Perfil"
+              >
+                <div className="w-9 h-9 lg:w-11 lg:h-11 bg-gradient-to-br from-petrobras-blue to-blue-600 rounded-xl lg:rounded-2xl flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-200">
+                  <User className="h-5 w-5 lg:h-6 lg:w-6 text-white" />
+                </div>
+                <div className="text-left hidden sm:block">
+                  <p className="text-xs lg:text-sm font-bold text-gray-900">Admin</p>
+                  <p className="text-xs text-gray-500 font-medium hidden lg:block">admin@silec.com</p>
+                </div>
+              </button>
             </div>
           </div>
         </div>
       </div>
+      <NotificationsModal isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
+      <MessagesModal isOpen={messagesOpen} onClose={() => setMessagesOpen(false)} />
+      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
     </header>
   );
 };

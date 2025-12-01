@@ -4,11 +4,18 @@ import com.hackathonbrasil.transpetro.model.Navio;
 import com.hackathonbrasil.transpetro.model.NavioRequestDto;
 import com.hackathonbrasil.transpetro.model.NavioResponseDto;
 import com.hackathonbrasil.transpetro.repository.NavioRepository;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVRecord;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.text.Normalizer;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -99,8 +106,107 @@ public class NavioService {
     }
 
     public List<NavioResponseDto> listarTodos() {
-        return navioRepository.findAll().stream()
+        List<NavioResponseDto> naviosFromDB = navioRepository.findAll().stream()
             .map(this::toResponseDto)
+            .collect(Collectors.toList());
+
+        Set<String> nomesNormalizados = naviosFromDB.stream()
+            .map(n -> normalizeShipName(n.getNome()))
+            .collect(Collectors.toSet());
+
+        try {
+            Reader in = new InputStreamReader(new ClassPathResource("dados_navio.csv").getInputStream());
+            Iterable<CSVRecord> records = CSVFormat.DEFAULT
+                .builder()
+                .setHeader("Nome do navio", "Classe", "Tipo", "Porte Bruto", "Comprimento total (m)", "Boca (m)", "Calado (m)", "Pontal (m)")
+                .setSkipHeaderRecord(true)
+                .build()
+                .parse(in);
+
+            for (CSVRecord record : records) {
+                String nomeNavio = record.get("Nome do navio").trim();
+                if (!nomeNavio.isEmpty()) {
+                    String normalized = normalizeShipName(nomeNavio);
+                    if (!nomesNormalizados.contains(normalized)) {
+                        nomesNormalizados.add(normalized);
+                        NavioResponseDto dto = new NavioResponseDto();
+                        dto.setNome(nomeNavio);
+                        dto.setClasse(record.get("Classe").trim());
+                        dto.setTipo(record.get("Tipo").trim());
+                        try {
+                            dto.setPorteBruto(Double.parseDouble(record.get("Porte Bruto").trim()));
+                        } catch (NumberFormatException ignored) {}
+                        try {
+                            dto.setComprimentoTotal(Double.parseDouble(record.get("Comprimento total (m)").trim()));
+                        } catch (NumberFormatException ignored) {}
+                        try {
+                            dto.setBoca(Double.parseDouble(record.get("Boca (m)").trim()));
+                        } catch (NumberFormatException ignored) {}
+                        try {
+                            dto.setCalado(Double.parseDouble(record.get("Calado (m)").trim()));
+                        } catch (NumberFormatException ignored) {}
+                        try {
+                            dto.setPontal(Double.parseDouble(record.get("Pontal (m)").trim()));
+                        } catch (NumberFormatException ignored) {}
+                        naviosFromDB.add(dto);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Erro ao ler CSV de navios: " + e.getMessage());
+        }
+
+        return naviosFromDB;
+    }
+
+    private String normalizeShipName(String name) {
+        if (name == null) return "";
+        return Normalizer.normalize(name.trim(), Normalizer.Form.NFD)
+            .replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+            .toLowerCase()
+            .replaceAll("\\s+", " ");
+    }
+
+    public List<String> listarTodosNomesUnicos() {
+        Set<String> nomesUnicosNormalizados = new LinkedHashSet<>();
+        Map<String, String> normalizedToOriginal = new HashMap<>();
+
+        navioRepository.findAll().forEach(navio -> {
+            String nome = navio.getNome().trim();
+            String normalized = normalizeShipName(nome);
+            if (!normalizedToOriginal.containsKey(normalized)) {
+                normalizedToOriginal.put(normalized, nome);
+            }
+            nomesUnicosNormalizados.add(normalized);
+        });
+
+        try {
+            Reader in = new InputStreamReader(new ClassPathResource("dados_navio.csv").getInputStream());
+            Iterable<CSVRecord> records = CSVFormat.DEFAULT
+                .builder()
+                .setHeader("Nome do navio", "Classe", "Tipo", "Porte Bruto", "Comprimento total (m)", "Boca (m)", "Calado (m)", "Pontal (m)")
+                .setSkipHeaderRecord(true)
+                .build()
+                .parse(in);
+
+            for (CSVRecord record : records) {
+                String nomeNavio = record.get("Nome do navio").trim();
+                if (!nomeNavio.isEmpty()) {
+                    String normalized = normalizeShipName(nomeNavio);
+                    if (!nomesUnicosNormalizados.contains(normalized)) {
+                        nomesUnicosNormalizados.add(normalized);
+                        normalizedToOriginal.put(normalized, nomeNavio);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Erro ao ler CSV de navios: " + e.getMessage());
+        }
+
+        return nomesUnicosNormalizados.stream()
+            .map(normalized -> normalizedToOriginal.get(normalized))
+            .filter(Objects::nonNull)
+            .sorted()
             .collect(Collectors.toList());
     }
 

@@ -94,4 +94,3 @@ public class Relatorio {
         updatedAt = LocalDateTime.now();
     }
 }
-

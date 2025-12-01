@@ -12,9 +12,9 @@ Este projeto implementa um modelo preditivo para calcular o **HPI (Hull Performa
 
 ### 🛠️ Tecnologias Utilizadas
 
-* **Backend:** Java, Spring Boot
+* **Backend:** Java, Spring Boot, H2 Database
 * **Modelo Analítico:** Regressão Linear Múltipla (OLS)
-* **Frontend:** HTML, JavaScript (Chart.js) para visualização em Dashboard.
+* **Frontend:** React 18, TypeScript, Tailwind CSS, Vite
 * **Dados:** Arquivos CSV históricos de eventos e consumo (`ResultadoQueryEventos.csv`).
 
 ---
@@ -51,6 +51,24 @@ Certifique-se de que os seguintes softwares estão instalados em seu ambiente:
 
 O backend estará acessível em `http://localhost:8080`.
 
+### 3. Frontend
+
+```bash
+# 1. Entrar na pasta do frontend
+cd frontend
+
+# 2. Instalar dependências
+npm install
+
+# 3. Executar o servidor de desenvolvimento
+npm run dev
+```
+
+O frontend estará disponível em `http://localhost:5173`
+
+**Pré-requisitos do Frontend:**
+- Node.js 18+ e npm 9+
+
 ---
 
 ## 📖 Documentação da API (Swagger/OpenAPI)
@@ -70,15 +88,15 @@ $$\mathbf{http://localhost:8080/swagger-ui/index.html}$$
 
 | Componente | Localização | Descrição |
 | :--- | :--- | :--- |
-| **Modelo Analítico** | `[...]/service/ModelService.java` | Lógica de treino, Feature Engineering e aplicação do OLS. |
-| **Frontend/Dashboard** | `src/main/resources/static/` | Contém `index.html` (com o dashboard completo) e `script.js` (se usado). |
-| **API REST (Endpoints)** | `[...]/controller/PrevisaoController.java` | Controlador REST que expõe as funcionalidades de previsão. |
+| **Modelo Analítico** | `src/main/java/.../service/ModelService.java` | Lógica de treino, Feature Engineering e aplicação do OLS. |
+| **Frontend/Dashboard** | `frontend/src/` | Aplicação React com TypeScript, componentes e páginas. |
+| **API REST (Endpoints)** | `src/main/java/.../controller/` | Controladores REST que expõem as funcionalidades. |
 
 ---
 
 ## 💻 Endpoints da API
 
-A funcionalidade central de previsão é acessada através do endpoint:
+### Previsão
 
 | Método | URL | Descrição |
 | :--- | :--- | :--- |
@@ -87,16 +105,24 @@ A funcionalidade central de previsão é acessada através do endpoint:
 **Exemplo de Acesso:**
 `http://localhost:8080/api/v1/previsao/limpeza-sugerida?navioId=Bruno%20Lima`
 
+### CRUDs
+
+- `GET /api/v1/navios` - Listar todos os navios
+- `POST /api/v1/navios` - Criar navio
+- `GET /api/v1/relatorios` - Listar relatórios
+- `POST /api/v1/import/navios` - Importar CSV de navios
+
 ---
 
 ## 📈 Acesso ao Dashboard Visual
 
 O dashboard de visualização da frota é a melhor forma de consumir a solução:
 
-1.  Certifique-se de que o backend está rodando.
-2.  Abra o seguinte link no seu navegador:
+1.  Certifique-se de que o backend está rodando em `http://localhost:8080`.
+2.  Inicie o frontend com `npm run dev` na pasta `frontend/`.
+3.  Abra o seguinte link no seu navegador:
     ```
-    http://localhost:8080/
+    http://localhost:5173
     ```
 O frontend fará requisições assíncronas para carregar o resumo de todos os navios e seus respectivos gráficos de projeção.
 
@@ -122,14 +148,4 @@ Transforma a ineficiência do HPI em um custo diário e tangível.
 $$\mathbf{\text{C}_{\text{Extra}}} = \mathbf{\text{CFI}_{\text{Limpo}}} \times (\mathbf{\text{HPI}} - 1.0)$$
 
 Este é o valor em **Toneladas/Dia** que está sendo perdido devido à incrustação e que serve como base para o cálculo do **ROI da limpeza**.
-
----
-
-## 🤝 Contribuições
-
-Contribuições são muito bem-vindas! Se encontrar um bug ou tiver sugestões de melhoria (como adicionar a variável de custo do combustível ou novas *features* de *Feature Engineering*):
-
-1.  Crie um *fork* do projeto.
-2.  Crie sua *branch* de recurso (`git checkout -b feature/minha-feature`).
-3.  Faça o *commit* das suas alterações.
-4.  Abra um *Pull Request* claro e conciso.
+- Calvin
