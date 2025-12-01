@@ -59,9 +59,9 @@ FROM openjdk:17.0.1-jdk-slim
 WORKDIR /app
 
 # Copia o JAR construído da Stage 2 para a imagem final
-# CORREÇÃO: Usamos um wildcard (*.jar) para garantir que o nome exato do JAR (que inclui a versão/snapshot)
-# seja copiado corretamente, resolvendo o erro 'Invalid or corrupt jarfile'.
-COPY --from=backend-builder /app/hackathon-transpetro-backend/target/*.jar app.jar
+# CORREÇÃO: Removemos o subdiretório do módulo ('hackathon-transpetro-backend') do caminho de origem do JAR,
+# presumindo que o JAR é criado em '/app/target' porque a compilação ocorreu no WORKDIR /app.
+COPY --from=backend-builder /app/target/*.jar app.jar
 
 # O Render espera que a aplicação escute na porta 10000
 EXPOSE 10000
