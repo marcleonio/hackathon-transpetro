@@ -7,7 +7,6 @@ FROM node:18-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 # Copia os arquivos de dependência do React
-# A pasta do frontend é frontend
 COPY frontend/package*.json ./
 
 # Instala as dependências do React
@@ -16,7 +15,10 @@ RUN npm install
 # Copia o código fonte do React
 COPY frontend/ ./
 
-# Constrói a aplicação React (gera arquivos estáticos na pasta 'build')
+# Constrói a aplicação React (gera arquivos estáticos na pasta 'dist')
+# O Render CLI ou a sua configuração de build podem estar esperando 'dist' ao invés de 'build'.
+# Verifique o seu package.json para confirmar a pasta de saída (geralmente 'dist' para Vite/Vue/modern frameworks, ou 'build' para React padrão).
+# Assumindo que o comando 'npm run build' gera a pasta 'dist', conforme o COPY seguinte.
 RUN npm run build
 
 # ===============================================
@@ -28,25 +30,26 @@ FROM maven:3.8.5-openjdk-17 AS backend-builder
 # Define o diretório de trabalho no contêiner
 WORKDIR /app
 
-# Copia o pom.xml principal do projeto (multi-módulo)
-COPY pom.xml ./
-
-# Copia o código fonte do backend
-COPY ./ ./hackathon-transpetro-backend/
+# CORREÇÃO: Copia todo o contexto de build para o diretório de trabalho /app.
+# Isso garante que a estrutura multi-módulo (pom.xml principal e a pasta do módulo)
+# seja preservada e o Maven encontre o projeto corretamente.
+COPY . .
 
 # --- Integração Frontend no Backend ---
-# Cria a pasta estática dentro do projeto Spring Boot
+# A pasta de recursos estáticos do Spring Boot
 RUN mkdir -p hackathon-transpetro-backend/src/main/resources/static
 
 # Copia os arquivos estáticos construídos pelo React para a pasta de recursos estáticos do Spring Boot
+# Note que a pasta de origem no frontend foi alterada para 'dist', que é o output comum para npm build.
 COPY --from=frontend-builder /app/frontend/dist ./hackathon-transpetro-backend/src/main/resources/static
 
 # Constrói o JAR final do Spring Boot (com os arquivos do React dentro)
+# Este comando agora deve funcionar, pois a estrutura de pastas do Maven está correta.
 RUN mvn clean install -DskipTests
 
 # Define o nome do arquivo JAR que será gerado pelo Maven.
-# Você pode precisar ajustar a versão (ex: 0.0.1-SNAPSHOT) se for diferente no seu pom.xml do backend.
-# Aconselho a verificar o nome exato no seu pom.xml.
+# Você deve garantir que 'transpetro-0.0.1-SNAPSHOT.jar' corresponde ao nome e versão no seu pom.xml.
+# Este ARG deve vir antes da próxima etapa FROM para ser usado nela.
 ARG JAR_FILE=hackathon-transpetro-backend/target/transpetro-0.0.1-SNAPSHOT.jar
 
 # ===============================================
@@ -65,6 +68,4 @@ COPY --from=backend-builder ${JAR_FILE} app.jar
 EXPOSE 10000
 
 # Comando para iniciar a aplicação
-# O Spring Boot detecta automaticamente a variável de ambiente $PORT do Render
-# (que é 10000) e configura a porta do servidor.
 CMD ["java", "-jar", "app.jar"]
