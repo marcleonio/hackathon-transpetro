@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { CleaningSuggestion } from '../types';
 import { shipService } from '../service/shipService';
 import { navioService } from '../service/navioService';
+import { NAVIOS } from '../utils/constants';
 
 interface UseShipsReturn {
   ships: Record<string, CleaningSuggestion>;
@@ -28,8 +29,20 @@ export const useShips = (): UseShipsReturn => {
     }
 
     try {
-      const naviosFromDB = await navioService.getAll();
-      const allNavios = naviosFromDB.map(navio => navio.nome.trim());
+      let allNavios: string[] = [];
+      
+      try {
+        const naviosFromDB = await navioService.getAll();
+        allNavios = naviosFromDB.map(navio => navio.nome.trim());
+      } catch (error) {
+        // Fallback para lista hardcoded se o serviço falhar
+        allNavios = [...NAVIOS];
+      }
+      
+      // Se não houver navios do banco, usa a lista hardcoded
+      if (allNavios.length === 0) {
+        allNavios = [...NAVIOS];
+      }
       
       setTotalNavios(allNavios.length);
 
@@ -43,7 +56,11 @@ export const useShips = (): UseShipsReturn => {
         const batchPromises = batch.map(async (navioId) => {
           try {
             const data = await shipService.getCleaningSuggestion(navioId);
-            results[navioId] = data;
+            if (data && data.navioId) {
+              results[navioId] = data;
+            } else {
+              errorResults[navioId] = 'Dados inválidos recebidos';
+            }
           } catch (error: unknown) {
             const errorMessage =
               error instanceof Error ? error.message : 'Erro ao carregar dados';

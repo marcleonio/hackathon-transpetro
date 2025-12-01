@@ -7,24 +7,38 @@ export const isValidCleaningSuggestion = (
 
   const suggestion = data as Partial<CleaningSuggestion>;
 
-  // Validação mais flexível - permite valores padrão
-  return (
-    typeof suggestion.navioId === 'string' &&
-    suggestion.navioId.length > 0 &&
-    typeof suggestion.nivelBioincrustacao === 'number' &&
-    !isNaN(suggestion.nivelBioincrustacao) &&
-    typeof suggestion.cfiCleanTonPerDay === 'number' &&
-    !isNaN(suggestion.cfiCleanTonPerDay) &&
-    typeof suggestion.maxExtraFuelTonPerDay === 'number' &&
-    !isNaN(suggestion.maxExtraFuelTonPerDay) &&
-    (typeof suggestion.diasParaIntervencao === 'number' || suggestion.diasParaIntervencao === undefined) &&
-    (typeof suggestion.porcentagemComprometimentoAtual === 'number' || suggestion.porcentagemComprometimentoAtual === undefined) &&
-    Array.isArray(suggestion.predictions) &&
-    (suggestion.dataUltimaLimpeza === null ||
-      typeof suggestion.dataUltimaLimpeza === 'string') &&
-    (suggestion.dataIdealLimpeza === null ||
-      typeof suggestion.dataIdealLimpeza === 'string')
-  );
+  // Validação mais flexível - verifica apenas campos essenciais
+  const hasNavioId = typeof suggestion.navioId === 'string' && suggestion.navioId.length > 0;
+  const hasNivel = typeof suggestion.nivelBioincrustacao === 'number' && !isNaN(suggestion.nivelBioincrustacao);
+  const hasCfi = typeof suggestion.cfiCleanTonPerDay === 'number' && !isNaN(suggestion.cfiCleanTonPerDay);
+  const hasMaxFuel = typeof suggestion.maxExtraFuelTonPerDay === 'number' && !isNaN(suggestion.maxExtraFuelTonPerDay);
+  const hasPredictions = Array.isArray(suggestion.predictions);
+  
+  // Campos opcionais - mais permissivo
+  const validDias = suggestion.diasParaIntervencao === undefined || 
+    suggestion.diasParaIntervencao === null ||
+    (typeof suggestion.diasParaIntervencao === 'number' && !isNaN(suggestion.diasParaIntervencao));
+  const validPorcentagem = suggestion.porcentagemComprometimentoAtual === undefined ||
+    suggestion.porcentagemComprometimentoAtual === null ||
+    (typeof suggestion.porcentagemComprometimentoAtual === 'number' && !isNaN(suggestion.porcentagemComprometimentoAtual));
+  const validDataUltima = suggestion.dataUltimaLimpeza === undefined ||
+    suggestion.dataUltimaLimpeza === null || 
+    typeof suggestion.dataUltimaLimpeza === 'string';
+  const validDataIdeal = suggestion.dataIdealLimpeza === undefined ||
+    suggestion.dataIdealLimpeza === null ||
+    typeof suggestion.dataIdealLimpeza === 'string';
+  
+  // Campos de texto - aceita string ou null/undefined (será preenchido no sanitize)
+  const validJustificativa = suggestion.justificativa === undefined ||
+    suggestion.justificativa === null ||
+    typeof suggestion.justificativa === 'string';
+  const validStatus = suggestion.statusCascoAtual === undefined ||
+    suggestion.statusCascoAtual === null ||
+    typeof suggestion.statusCascoAtual === 'string';
+
+  return hasNavioId && hasNivel && hasCfi && hasMaxFuel && hasPredictions && 
+         validDias && validPorcentagem && validDataUltima && validDataIdeal &&
+         validJustificativa && validStatus;
 };
 
 export const isValidDailyPrediction = (
@@ -63,6 +77,8 @@ export const sanitizeCleaningSuggestion = (
     dataIdealLimpeza: data.dataIdealLimpeza ?? null,
     diasParaIntervencao: data.diasParaIntervencao ?? 0,
     porcentagemComprometimentoAtual: data.porcentagemComprometimentoAtual ?? 0,
+    justificativa: data.justificativa ?? 'Sem justificativa',
+    statusCascoAtual: data.statusCascoAtual ?? 'Status desconhecido',
     predictions: validPredictions,
   };
 };
