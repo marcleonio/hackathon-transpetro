@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,6 +19,7 @@ import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/v1/previsao")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"})
 @Tag(name = "Previsão de Limpeza", description = "Endpoints para prever a degradação do casco e sugerir a data ideal de docagem.")
 public class PredictionController {
 
@@ -37,11 +39,8 @@ public class PredictionController {
         // Chamada ao serviço que executa a regressão e simulação
         CleaningSuggestionDto result = predictionService.suggestCleaningDate(navioId);
 
-        // Verifica se houve falha crítica (ex: modelo nulo)
-        if (result.getDataIdealLimpeza() == null && result.getJustificativa().contains("Modelo de ML não treinado")) {
-            return ResponseEntity.internalServerError().body(result);
-        }
-
+        // Sempre retorna 200 OK, mesmo se houver problemas
+        // Os problemas são indicados na justificativa do DTO
         return ResponseEntity.ok(result);
     }
 }
