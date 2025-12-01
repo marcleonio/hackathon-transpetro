@@ -13,6 +13,7 @@ export const exportToCSV = (ships: Record<string, CleaningSuggestion>, filename 
     'Dias para Intervenção',
     'CFI Limpo (Ton/dia)',
     'Consumo Extra Máx (Ton/dia)',
+    'Comprometimento do Casco (%)',
   ];
 
   const rows = Object.values(ships).map((ship) => {
@@ -27,6 +28,7 @@ export const exportToCSV = (ships: Record<string, CleaningSuggestion>, filename 
       ship.diasParaIntervencao.toString(),
       ship.cfiCleanTonPerDay.toFixed(2),
       ship.maxExtraFuelTonPerDay.toFixed(2),
+      ship.porcentagemComprometimentoAtual.toFixed(2),
     ];
   });
 

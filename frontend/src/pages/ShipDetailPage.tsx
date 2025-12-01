@@ -261,6 +261,29 @@ export const ShipDetailPage: React.FC<ShipDetailPageProps> = ({
                     </div>
                   </div>
 
+                  <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      <span className="text-xs font-semibold text-orange-700 uppercase">Comprometimento do Casco</span>
+                    </div>
+                    <p className="text-2xl font-bold text-orange-600">
+                      {ship.porcentagemComprometimentoAtual.toFixed(2)}%
+                    </p>
+                    <div className="h-3 bg-orange-200 rounded-full mt-2">
+                      <div 
+                        className={cn(
+                          'h-full rounded-full transition-all',
+                          ship.porcentagemComprometimentoAtual >= 40 ? 'bg-red-600' :
+                          ship.porcentagemComprometimentoAtual >= 15 ? 'bg-orange-500' :
+                          ship.porcentagemComprometimentoAtual >= 1 ? 'bg-yellow-500' :
+                          'bg-green-500'
+                        )}
+                        style={{ width: `${Math.min(100, ship.porcentagemComprometimentoAtual)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-600 mt-2">Cobertura de incrustação estimada na superfície do casco</p>
+                  </div>
+
                   {ship.dataUltimaLimpeza && (
                     <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                       <div className="flex items-center gap-2 mb-2">

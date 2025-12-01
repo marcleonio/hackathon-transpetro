@@ -13,6 +13,7 @@ export const isValidCleaningSuggestion = (
     typeof suggestion.cfiCleanTonPerDay === 'number' &&
     typeof suggestion.maxExtraFuelTonPerDay === 'number' &&
     typeof suggestion.diasParaIntervencao === 'number' &&
+    typeof suggestion.porcentagemComprometimentoAtual === 'number' &&
     Array.isArray(suggestion.predictions) &&
     (suggestion.dataUltimaLimpeza === null ||
       typeof suggestion.dataUltimaLimpeza === 'string') &&
@@ -56,6 +57,7 @@ export const sanitizeCleaningSuggestion = (
     dataUltimaLimpeza: data.dataUltimaLimpeza ?? null,
     dataIdealLimpeza: data.dataIdealLimpeza ?? null,
     diasParaIntervencao: data.diasParaIntervencao ?? 0,
+    porcentagemComprometimentoAtual: data.porcentagemComprometimentoAtual ?? 0,
     predictions: validPredictions,
   };
 };

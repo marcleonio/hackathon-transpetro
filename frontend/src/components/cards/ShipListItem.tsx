@@ -9,7 +9,7 @@ import {
 } from '../../utils/hpiUtils';
 import { formatStatus } from '../../utils/textUtils';
 import { BiofoulingLevel } from '../../types';
-import { Ship, Calendar, Fuel, TrendingUp, ChevronRight } from 'lucide-react';
+import { Ship, Calendar, Fuel, TrendingUp, ChevronRight, AlertTriangle } from 'lucide-react';
 import { cn } from '../../utils';
 
 interface ShipListItemProps {
@@ -106,6 +106,16 @@ export const ShipListItem: React.FC<ShipListItemProps> = ({ data, onClick }) => 
           </div>
           <p className="text-xs font-bold text-red-600 truncate">
             {data.maxExtraFuelTonPerDay.toFixed(2)} Ton/Dia
+          </p>
+        </div>
+
+        <div className="col-span-6 sm:col-span-2 min-w-0">
+          <div className="flex items-center gap-1.5 mb-1">
+            <AlertTriangle className="h-3 w-3 text-orange-600 flex-shrink-0" />
+            <span className="text-xs font-semibold text-orange-700 truncate">Comprometimento</span>
+          </div>
+          <p className="text-xs font-bold text-orange-600 truncate">
+            {data.porcentagemComprometimentoAtual.toFixed(1)}%
           </p>
         </div>
 
