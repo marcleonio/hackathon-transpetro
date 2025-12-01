@@ -93,13 +93,13 @@ Este projeto implementa um modelo preditivo para calcular o **HPI (Hull Performa
 ### 3. Configuração do Frontend
 
 1.  **Navegue até a pasta do frontend:**
-    ```bash
-    cd frontend
+```bash
+cd frontend
     ```
 
 2.  **Instale as dependências:**
     ```bash
-    npm install
+npm install
     ```
 
 3.  **Configure variáveis de ambiente (opcional):**
@@ -133,8 +133,8 @@ Este projeto implementa um modelo preditivo para calcular o **HPI (Hull Performa
    ```bash
    # Em outro terminal, na pasta frontend
    cd frontend
-   npm run dev
-   ```
+npm run dev
+```
 
 3. **Acesse a aplicação:**
    - Frontend: `http://localhost:3000` (ou a porta indicada pelo Vite)

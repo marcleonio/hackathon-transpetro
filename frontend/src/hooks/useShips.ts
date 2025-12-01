@@ -30,9 +30,9 @@ export const useShips = (): UseShipsReturn => {
 
     try {
       let allNavios: string[] = [];
-      
-      try {
-        const naviosFromDB = await navioService.getAll();
+
+    try {
+      const naviosFromDB = await navioService.getAll();
         allNavios = naviosFromDB.map(navio => navio.nome.trim());
       } catch (error) {
         // Fallback para lista hardcoded se o serviço falhar
@@ -57,7 +57,7 @@ export const useShips = (): UseShipsReturn => {
           try {
             const data = await shipService.getCleaningSuggestion(navioId);
             if (data && data.navioId) {
-              results[navioId] = data;
+            results[navioId] = data;
             } else {
               errorResults[navioId] = 'Dados inválidos recebidos';
             }
