@@ -218,6 +218,10 @@ public class RelatorioService {
         relatorio.setStatus(dto.getStatus() != null ? dto.getStatus() : relatorio.getStatus());
         relatorio.setCoordenadas(dto.getCoordenadas());
         relatorio.setObservacoesAdicionais(dto.getObservacoesAdicionais());
+<<<<<<< HEAD
+=======
+        
+>>>>>>> 749554a9cb1fa3b060973c7fa338a12871ed1083
         if (dto.getRegistradoPor() != null) {
             relatorio.setRegistradoPor(dto.getRegistradoPor());
         }
